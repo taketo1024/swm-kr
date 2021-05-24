@@ -5,8 +5,10 @@
 //  Created by Taketo Sano on 2021/05/10.
 //
 
-import SwiftyMath
-import SwiftyHomology
+import SwmCore
+import SwmKnots
+import SwmHomology
+import SwmKhovanov
 
 public struct KR {
     public struct _x: PolynomialIndeterminate {

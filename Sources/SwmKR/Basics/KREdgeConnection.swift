@@ -5,8 +5,9 @@
 //  Created by Taketo Sano on 2021/05/07.
 //
 
-import SwiftyMath
-import SwiftyHomology
+import SwmCore
+import SwmKnots
+import SwmHomology
 
 internal class KREdgeConnection<R: Ring> {
     let L: Link

@@ -4,34 +4,44 @@
 import PackageDescription
 
 let package = Package(
-    name: "SwiftyKnots",
+    name: "swm-kr",
     products: [
         .library(
-            name: "SwiftyKnots",
-            targets: ["SwiftyKnots"]
+            name: "SwmKR",
+            targets: ["SwmKR"]
         ),
     ],
     dependencies: [
         .package(
-			name:"SwiftyMath",
-			url: "https://github.com/taketo1024/SwiftyMath.git",
-			from:"3.0.0"
+			url: "https://github.com/taketo1024/swm-core.git",
+			from:"1.0.1"
 		),
         .package(
-			name:"SwiftyHomology",
-			url: "https://github.com/taketo1024/SwiftyMath-homology.git",
-			from: "3.0.0"
+			url: "https://github.com/taketo1024/swm-knots.git",
+			from: "1.0.0"
+		),
+        .package(
+			url: "https://github.com/taketo1024/swm-homology.git",
+			from: "1.0.0"
+		),
+        .package(
+			url: "https://github.com/taketo1024/swm-khovanov.git",
+			from: "1.0.0"
 		),
     ],
     targets: [
         .target(
-            name: "SwiftyKnots",
-            dependencies: ["SwiftyMath", "SwiftyHomology"],
-			resources: [.process("Resources")]
+            name: "SwmKR",
+            dependencies: [
+                .product(name: "SwmCore", package: "swm-core"),
+                .product(name: "SwmKnots", package: "swm-knots"),
+                .product(name: "SwmHomology", package: "swm-homology"),
+                .product(name: "SwmKhovanov", package: "swm-khovanov"),
+			]
 		),
         .testTarget(
-            name: "SwiftyKnotsTests",
-            dependencies: ["SwiftyKnots"]
+            name: "SwmKRTests",
+            dependencies: ["SwmKR"]
 		),
     ]
 )
