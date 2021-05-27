@@ -19,6 +19,9 @@ internal struct KRTotalCube<R: Ring>: ModuleCube {
     let connection: [Int : KR.EdgeConnection<R>]
     let vertex: (Coords) -> Vertex
     
+    private let vertexCache: Cache<Coords, Vertex> = .empty
+    private let   edgeCache: Cache<Coords, Edge>   = .empty
+    
     init(link L: Link, connection: [Int : KR.EdgeConnection<R>], vertex: @escaping (Coords) -> Vertex) {
         self.L = L
         self.connection = connection
@@ -30,7 +33,9 @@ internal struct KRTotalCube<R: Ring>: ModuleCube {
     }
     
     subscript(v: Coords) -> ModuleStructure<BaseModule> {
-        vertex(v)
+        vertexCache.getOrSet(key: v) {
+            vertex(v)
+        }
     }
     
     private func edgeFactor(from: Coords, to: Coords, subcoords: Coords) -> KR.EdgeRing<R> {
@@ -56,11 +61,17 @@ internal struct KRTotalCube<R: Ring>: ModuleCube {
     }
     
     func edge(from: Coords, to: Coords) -> ModuleEnd<BaseModule> {
-        return ModuleEnd { x -> BaseModule in
-            x.elements.sum { (subcoords, z) -> BaseModule in
-                let e = edgeFactor(from: from, to: to, subcoords: subcoords)
-                let p = (MultivariatePolynomial(z) * e).asLinearCombination
-                return GradedModule(index: subcoords, value: p)
+        edgeCache.getOrSet(key: from.concat(with: to)) {
+            let e = edgeSign(from: from, to: to)
+            return .init { x -> BaseModule in
+                x.elements.sum { (subcoords, z) -> BaseModule in
+                    let p = edgeFactor(from: from, to: to, subcoords: subcoords)
+                    let q = MultivariatePolynomial(z)
+                    return GradedModule(
+                        index: subcoords,
+                        value: e * (p * q).asLinearCombination
+                    )
+                }
             }
         }
     }

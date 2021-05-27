@@ -20,6 +20,9 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
     let slice: Int
     let connection: [Int : KR.EdgeConnection<R>]
     
+    private let vertexCache: Cache<Coords, Vertex> = .empty
+    private let   edgeCache: Cache<Coords, Edge>   = .empty
+    
     init(link L: Link, vCoords: Coords, slice: Int, connection: [Int : KR.EdgeConnection<R>]) {
         self.L = L
         self.vCoords = vCoords
@@ -41,17 +44,19 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
     }
     
     subscript(v: Coords) -> ModuleStructure<BaseModule> {
-        let deg = slice + v.weight + (baseGrading - gradingShift(at: v))[0] / 2
-        if deg >= 0 {
-            let mons = KR.EdgeRing<R>.monomials(
-                ofDegree: 2 * deg,
-                usingIndeterminates: 0 ..< dim
-            ).map {
-                BaseModule.Generator(exponent: $0.leadExponent)
+        vertexCache.getOrSet(key: v) {
+            let deg = slice + v.weight + (baseGrading - gradingShift(at: v))[0] / 2
+            if deg >= 0 {
+                let mons = KR.EdgeRing<R>.monomials(
+                    ofDegree: 2 * deg,
+                    usingIndeterminates: 0 ..< dim
+                ).map {
+                    BaseModule.Generator(exponent: $0.leadExponent)
+                }
+                return ModuleStructure<BaseModule>(rawGenerators: mons)
+            } else {
+                return .zeroModule
             }
-            return ModuleStructure<BaseModule>(rawGenerators: mons)
-        } else {
-            return .zeroModule
         }
     }
     
@@ -79,10 +84,13 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
     }
     
     func edge(from: Coords, to: Coords) -> ModuleEnd<BaseModule> {
-        let p = edgeFactor(from: from, to: to)
-        return .init { z -> BaseModule in
-            let q = MultivariatePolynomial(z)
-            return (p * q).asLinearCombination
+        edgeCache.getOrSet(key: from.concat(with: to)) {
+            let e = edgeSign(from: from, to: to)
+            let p = edgeFactor(from: from, to: to)
+            return .init { z -> BaseModule in
+                let q = MultivariatePolynomial(z)
+                return e * (p * q).asLinearCombination
+            }
         }
     }
 }
