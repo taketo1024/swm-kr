@@ -119,7 +119,7 @@ public struct KRHomology<R: EuclideanRing> {
         let cube = KRTotalCube<R>(link: L, connection: connection) { vCoords -> KRTotalCube<R>.Vertex in
             let H = hHomologyCache.getOrSet(key: hKey(vCoords: vCoords, slice: slice)) {
                 let C = self.horizontalComplex(at: vCoords, slice: slice)
-                let H = C.homology(options: [.withGenerators, .withVectorizer])
+                let H = C.homology()
                 return H
             }
             return H[h]
