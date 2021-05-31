@@ -10,56 +10,6 @@ import SwmKnots
 import SwmHomology
 import SwmKhovanov
 
-public struct KR {
-    public struct _x: PolynomialIndeterminate {
-        public static let degree = 2
-        public static var symbol = "x"
-    }
-    public typealias _xn = EnumeratedPolynomialIndeterminates<_x, anySize>
-    
-    public typealias Grading = MultiIndex<_3>
-    public typealias EdgeRing<R: Ring> = MultivariatePolynomial<R, _xn>
-    public typealias BaseModule<R: Ring> = LinearCombination<R, MonomialAsGenerator<_xn>>
-    public typealias HorizontalModule<R: Ring> = GradedModule<Cube.Coords, BaseModule<R>>
-    public typealias TotalModule<R: Ring> = GradedModule<Cube.Coords, HorizontalModule<R>>
-
-    static func baseGrading(link L: Link, hCoords: Cube.Coords, vCoords: Cube.Coords) -> KR.Grading {
-        (0 ..< L.crossingNumber).sum { i -> KR.Grading in
-            switch (L.crossings[i].crossingSign, hCoords[i], vCoords[i]) {
-            case (+1, 0, 0):
-                return [2, -2, -2]
-            case (+1, 1, 0):
-                return [0, 0, -2]
-            case (+1, 0, 1):
-                return [0, -2, 0]
-            case (+1, 1, 1):
-                return [0, 0, 0]
-                
-            case (-1, 0, 0):
-                return [0, -2, 0]
-            case (-1, 1, 0):
-                return [0, 0, 0]
-            case (-1, 0, 1):
-                return [0, -2, 2]
-            case (-1, 1, 1):
-                return [-2, 0, 2]
-                
-            default:
-                fatalError("impossible")
-            }
-        }
-    }
-
-    struct EdgeConnection<R: Ring>: CustomStringConvertible {
-        let ik: EdgeRing<R>
-        let il: EdgeRing<R>
-        
-        var description: String {
-            "\((ik: ik, il: il))"
-        }
-    }
-}
-
 public struct KRHomology<R: EuclideanRing> {
     public let L: Link
     public let normalized: Bool
@@ -128,21 +78,21 @@ public struct KRHomology<R: EuclideanRing> {
     }
     
     public func structure() -> [KR.Grading : ModuleStructure<KR.TotalModule<R>>] {
-        var res: [KR.Grading : ModuleStructure<KR.TotalModule<R>>] = [:]
+        typealias E = (KR.Grading, ModuleStructure<KR.TotalModule<R>>)
         
         let n = L.crossingNumber
-        for s in minSlice ... 0 {
-            for h in 0 ... n {
+        let seq = Array(minSlice ... 0).flatMap { s -> [E] in
+            Array(0 ... n).flatMap { h -> [E] in
                 let Cv = totalComplex(hDegree: h, slice: s)
                 let H = Cv.homology()
-                
-                for v in 0 ... n where !H[v].isZero {
+                return (0 ... n).compactMap { v -> E? in
                     let (i, j, k) = hvs2ijk(h, v, s)
-                    res[[i, j, k]] = H[v]
+                    let Hv = H[v]
+                    return !Hv.isZero ? ([i, j, k], Hv) : nil
                 }
             }
         }
-        return res
+        return Dictionary(seq)
     }
     
     public func gradedEulerCharacteristic() -> String {
