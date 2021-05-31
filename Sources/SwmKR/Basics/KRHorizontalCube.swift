@@ -61,15 +61,11 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
     }
     
     private func edgeFactor(from: Coords, to: Coords) -> KR.EdgeRing<R> {
-        if !(from < to) {
-            return .zero
+        assert((to - from).weight == 1)
+        guard let p = (to - from).enumerated().first(where: { (_, b) in b == 1})?.offset else {
+            fatalError()
         }
-        let e = (to - from).enumerated().filter{ (_, b) in b == 1 }
-        if e.count > 1 {
-            return .zero
-        }
-        
-        let p = e.first!.offset
+
         let c = connection[p]!
         let (ik, il) = (c.ik, c.il)
         
