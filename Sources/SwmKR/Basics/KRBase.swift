@@ -17,6 +17,16 @@ public struct KR {
             public static var symbol = "x"
         }
         public typealias xn = EnumeratedPolynomialIndeterminates<x, anySize>
+        
+        public struct q: PolynomialIndeterminate {
+            public static let symbol = "q"
+        }
+        
+        public struct a: PolynomialIndeterminate {
+            public static let symbol = "a"
+        }
+        
+        public typealias qa = BivariatePolynomialIndeterminates<q, a>
     }
 
     public typealias Grading = MultiIndex<_3>
@@ -24,6 +34,9 @@ public struct KR {
     public typealias BaseModule<R: Ring> = LinearCombination<R, MonomialAsGenerator<Indeterminates.xn>>
     public typealias HorizontalModule<R: Ring> = GradedModule<Cube.Coords, BaseModule<R>>
     public typealias TotalModule<R: Ring> = GradedModule<Cube.Coords, HorizontalModule<R>>
+    
+    public typealias qPolynomial<R: Ring>  = LaurentPolynomial<R, Indeterminates.q>
+    public typealias qaPolynomial<R: Ring> = MultivariateLaurentPolynomial<R, Indeterminates.qa>
 
     static func baseGrading(link L: Link, hCoords: Cube.Coords, vCoords: Cube.Coords) -> KR.Grading {
         (0 ..< L.crossingNumber).sum { i -> KR.Grading in
