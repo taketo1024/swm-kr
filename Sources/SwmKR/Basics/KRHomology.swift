@@ -16,7 +16,9 @@ public struct KRHomology<R: EuclideanRing> {
     
     private let gradingShift: KR.Grading
     private var connection: [Int : KR.EdgeConnection<R>]
-    private let hHomologyCache: Cache<hKey, ModuleGrid1<KR.HorizontalModule<R>>> = .empty
+    
+    private let horizontalHomologyCache: Cache<hKey, ModuleGrid1<KR.HorizontalModule<R>>> = .empty
+    private let   verticalHomologyCache: Cache<vKey, ModuleGrid1<KR.TotalModule<R>>> = .empty
 
     public init(_ L: Link, normalized: Bool = true) {
         let w = L.writhe
@@ -32,8 +34,7 @@ public struct KRHomology<R: EuclideanRing> {
         guard let (h, v, s) = ijk2hvs(i, j, k) else {
             return .zeroModule
         }
-        let C = totalComplex(hDegree: h, slice: s)
-        let H = C.homology()
+        let H = verticalHomology(hDegree: h, slice: s)
         return H[v]
     }
     
@@ -65,41 +66,53 @@ public struct KRHomology<R: EuclideanRing> {
         return cube.asChainComplex()
     }
     
-    public func totalComplex(hDegree h: Int, slice: Int) -> ChainComplex1<KR.TotalModule<R>> {
+    public func horizontalHomology(at vCoords: Cube.Coords, slice: Int) -> ModuleGrid1<KR.HorizontalModule<R>> {
+        let key = hKey(vCoords: vCoords, slice: slice)
+        return horizontalHomologyCache.getOrSet(key: key) {
+            let C = self.horizontalComplex(at: vCoords, slice: slice)
+            return C.homology()
+        }
+    }
+    
+    public func verticalComplex(hDegree h: Int, slice s: Int) -> ChainComplex1<KR.TotalModule<R>> {
         let cube = KRTotalCube<R>(link: L, connection: connection) { vCoords -> KRTotalCube<R>.Vertex in
-            let H = hHomologyCache.getOrSet(key: hKey(vCoords: vCoords, slice: slice)) {
-                let C = self.horizontalComplex(at: vCoords, slice: slice)
-                let H = C.homology()
-                return H
-            }
+            let H = horizontalHomology(at: vCoords, slice: s)
             return H[h]
         }
         return cube.asChainComplex()
     }
     
-    public func structure() -> [KR.Grading : ModuleStructure<KR.TotalModule<R>>] {
+    public func verticalHomology(hDegree h: Int, slice s: Int) -> ModuleGrid1<KR.TotalModule<R>> {
+        let key = vKey(hDegree: h, slice: s)
+        return verticalHomologyCache.getOrSet(key: key) {
+            let C = verticalComplex(hDegree: h, slice: s)
+            return C.homology()
+        }
+    }
+    
+    public func structure(restrictedTo: (Int, Int, Int) -> Bool = { (_, _, _) in true }) -> [KR.Grading : ModuleStructure<KR.TotalModule<R>>] {
         typealias E = (KR.Grading, ModuleStructure<KR.TotalModule<R>>)
         
         let n = L.crossingNumber
-        let seq = Array(minSlice ... 0).flatMap { s -> [E] in
-            Array(0 ... n).flatMap { h -> [E] in
-                let Cv = totalComplex(hDegree: h, slice: s)
-                let H = Cv.homology()
-                return (0 ... n).compactMap { v -> E? in
-                    let (i, j, k) = hvs2ijk(h, v, s)
-                    let Hv = H[v]
-                    return !Hv.isZero ? ([i, j, k], Hv) : nil
+        let elements = (minSlice ... 0).flatMap { s -> [E] in
+            ((0 ... n) * (0 ... n)).compactMap { (h, v) -> E? in
+                let (i, j, k) = hvs2ijk(h, v, s)
+                if restrictedTo(i, j, k) {
+                    let H = self[i, j, k]
+                    return !H.isZero ? ([i, j, k], H) : nil
+                } else {
+                    return nil
                 }
             }
         }
-        return Dictionary(seq)
+        return Dictionary(elements)
     }
     
-    public func gradedEulerCharacteristic() -> String {
-        structure().map { (g, obj) -> String in
+    private func qaPolynomial(_ structure: [KR.Grading : ModuleStructure<KR.TotalModule<R>>]) -> KR.qaPolynomial<𝐙> {
+        .init(elements: structure.map { (g, V) in
             let (i, j, k) = (g[0], g[1], g[2])
-            return Format.linearCombination( [ ("a\(Format.sup(j))q\(Format.sup(i))", (-1).pow( (k - j) / 2)) ] )
-        }.joined(separator: " + ")
+            return ([i, j], (-1).pow( (k - j) / 2) * V.rank )
+        })
     }
     
     private func ijk2hvs(_ i: Int, _ j: Int, _ k: Int) -> (Int, Int, Int)? {
@@ -116,11 +129,18 @@ public struct KRHomology<R: EuclideanRing> {
     private func hvs2ijk(_ h: Int, _ v: Int, _ s: Int) -> (Int, Int, Int) {
         let g = baseGrading
         let (a, b, c) = (g[0], g[1], g[2])
-        return (a + 2 * h + 2 * s, b + 2 * h, c + 2 * v)
+        return (a + 2 * h + 2 * s,
+                b + 2 * h,
+                c + 2 * v)
     }
     
     private struct hKey: Hashable {
         let vCoords: Cube.Coords
+        let slice: Int
+    }
+
+    private struct vKey: Hashable {
+        let hDegree: Int
         let slice: Int
     }
 }
