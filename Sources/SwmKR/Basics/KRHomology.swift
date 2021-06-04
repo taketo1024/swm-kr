@@ -108,6 +108,67 @@ public struct KRHomology<R: EuclideanRing> {
         return Dictionary(elements)
     }
     
+    public func table(restrictedTo: (Int, Int, Int) -> Bool = { (_, _, _) in true }) -> String {
+        typealias qPoly = KR.qPolynomial<𝐙>
+        let str = structure(restrictedTo: restrictedTo)
+        let table = str
+            .group { (ijk, _) in
+                MultiIndex<_2>(ijk[1], ijk[2])
+            }
+            .mapValues{ list in
+                qPoly(elements: list.map{ (ijk, V) in
+                    (ijk[0], V.rank)
+                })
+            }
+        
+        return Format.table(
+            rows: table.keys.map{ $0[1] }.uniqued().sorted().reversed(), // k
+            cols: table.keys.map{ $0[0] }.uniqued().sorted(), // j
+            symbol: "k\\j",
+            printHeaders: true
+        ) { (k, j) -> String in
+            let q = table[[j, k]] ?? .zero
+            return !q.isZero ? "\(q)" : ""
+        }
+    }
+    
+    public func table(i: Int? = nil, j: Int? = nil, k: Int? = nil) -> String {
+        table { (i1, j1, k1) in
+            return
+                (i.flatMap{ $0 == i1 } ?? true)
+             && (j.flatMap{ $0 == j1 } ?? true)
+             && (k.flatMap{ $0 == k1 } ?? true)
+        }
+    }
+    
+    public var gradedEulerCharacteristic: KR.qaPolynomial<𝐙> {
+        qaPolynomial(structure())
+    }
+    
+    public var highestQPart: KR.qaPolynomial<𝐙> {
+        let i0 = L.crossingNumber - L.numberOfSeifertCircles + 1
+        let str = structure { (i, _, _) in i == i0 }
+        return qaPolynomial(str)
+    }
+    
+    public var lowestQPart: KR.qaPolynomial<𝐙> {
+        let i0 = -L.crossingNumber + L.numberOfSeifertCircles - 1
+        let str = structure { (i, _, _) in i == i0 }
+        return qaPolynomial(str)
+    }
+    
+    public var highestAPart: KR.qaPolynomial<𝐙> {
+        let j0 = -L.writhe + L.numberOfSeifertCircles - 1
+        let str = structure { (_, j, _) in j == j0 }
+        return qaPolynomial(str)
+    }
+    
+    public var lowestAPart: KR.qaPolynomial<𝐙> {
+        let j0 = L.writhe - L.numberOfSeifertCircles + 1
+        let str = structure { (_, j, _) in j == j0 }
+        return qaPolynomial(str)
+    }
+    
     private func qaPolynomial(_ structure: [KR.Grading : ModuleStructure<KR.TotalModule<R>>]) -> KR.qaPolynomial<𝐙> {
         .init(elements: structure.map { (g, V) in
             let (i, j, k) = (g[0], g[1], g[2])
