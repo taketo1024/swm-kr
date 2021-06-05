@@ -10,7 +10,7 @@ import SwmKnots
 import SwmHomology
 import SwmKhovanov
 
-public struct KRHomology<R: EuclideanRing> {
+public struct KRHomology<R: HomologyCalculatable> {
     public let L: Link
     public let normalized: Bool
     
