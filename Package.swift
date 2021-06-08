@@ -14,7 +14,7 @@ let package = Package(
     dependencies: [
         .package(
 			url: "https://github.com/taketo1024/swm-core.git",
-			from:"1.2.1"
+			from:"1.2.3"
 //            path: "../swm-core/"
 		),
         .package(
@@ -24,12 +24,12 @@ let package = Package(
 		),
         .package(
             url: "https://github.com/taketo1024/swm-homology.git",
-            from: "1.2.1"
+            from: "1.2.3"
 //            path: "../swm-homology/"
 		),
         .package(
             url: "https://github.com/taketo1024/swm-khovanov.git",
-            from: "1.1.2"
+            from: "1.1.3"
 //            path: "../swm-khovanov/"
         ),
     ],

@@ -10,7 +10,11 @@ import SwmKnots
 import SwmHomology
 import SwmKhovanov
 
-public struct KRHomology<R: HomologyCalculatable> {
+public struct KRHomology<R: HomologyCalculatable>: GradedModuleStructureType {
+    public typealias Index = MultiIndex<_3>
+    public typealias Object = ModuleStructure<KR.TotalModule<R>>
+    public typealias BaseModule = KR.TotalModule<R>
+
     public let L: Link
     public let normalized: Bool
     
@@ -30,7 +34,8 @@ public struct KRHomology<R: HomologyCalculatable> {
         self.connection = KREdgeConnection(L).compute()
     }
     
-    public subscript(i: Int, j: Int, k: Int) -> ModuleStructure<KR.TotalModule<R>> {
+    public subscript(idx: Index) -> Object {
+        let (i, j, k) = idx.triple
         guard let (h, v, s) = ijk2hvs(i, j, k) else {
             return .zeroModule
         }
@@ -40,6 +45,16 @@ public struct KRHomology<R: HomologyCalculatable> {
     
     public var minSlice: Int {
         -2 * L.crossingNumber
+    }
+    
+    public var support: [MultiIndex<_3>] {
+        let n = L.crossingNumber
+        return ((0 ... n) * (0 ... n)).flatMap { (h, v) in
+            (minSlice ... 0).map { s in
+                let (i, j, k) = hvs2ijk(h, v, s)
+                return [i, j, k]
+            }
+        }
     }
     
     public var baseGrading: KR.Grading {
@@ -139,6 +154,14 @@ public struct KRHomology<R: HomologyCalculatable> {
              && (j.flatMap{ $0 == j1 } ?? true)
              && (k.flatMap{ $0 == k1 } ?? true)
         }
+    }
+    
+    public func printTable(restrictedTo r: (Int, Int, Int) -> Bool = { (_, _, _) in true }) {
+        print(table(restrictedTo: r))
+    }
+    
+    public func printTable(i: Int? = nil, j: Int? = nil, k: Int? = nil) {
+        print(table(i: i, j: j, k: k))
     }
     
     public var gradedEulerCharacteristic: KR.qaPolynomial<𝐙> {
