@@ -10,10 +10,13 @@ import SwmKnots
 import SwmHomology
 import SwmKhovanov
 
-public struct KRHomology<R: HomologyCalculatable>: GradedModuleStructureType {
-    public typealias Index = MultiIndex<_3>
-    public typealias Object = ModuleStructure<KR.TotalModule<R>>
+public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
     public typealias BaseModule = KR.TotalModule<R>
+    public typealias Index = MultiIndex<_3>
+    public typealias Object = ModuleStructure<BaseModule>
+
+    public typealias HorizontalHomology = IndexedModuleStructure<Int, KR.HorizontalModule<R>>
+    public typealias VerticalHomology = IndexedModuleStructure<Int, KR.TotalModule<R>>
 
     public let L: Link
     public let normalized: Bool
@@ -21,8 +24,8 @@ public struct KRHomology<R: HomologyCalculatable>: GradedModuleStructureType {
     private let gradingShift: KR.Grading
     private var connection: [Int : KR.EdgeConnection<R>]
     
-    private let horizontalHomologyCache: Cache<hKey, ModuleGrid1<KR.HorizontalModule<R>>> = .empty
-    private let   verticalHomologyCache: Cache<vKey, ModuleGrid1<KR.TotalModule<R>>> = .empty
+    private let horizontalHomologyCache: Cache<hKey, HorizontalHomology> = .empty
+    private let verticalHomologyCache: Cache<vKey, VerticalHomology> = .empty
 
     public init(_ L: Link, normalized: Bool = true) {
         let w = L.writhe
@@ -81,7 +84,7 @@ public struct KRHomology<R: HomologyCalculatable>: GradedModuleStructureType {
         return cube.asChainComplex()
     }
     
-    public func horizontalHomology(at vCoords: Cube.Coords, slice: Int) -> ModuleGrid1<KR.HorizontalModule<R>> {
+    public func horizontalHomology(at vCoords: Cube.Coords, slice: Int) -> HorizontalHomology {
         let key = hKey(vCoords: vCoords, slice: slice)
         return horizontalHomologyCache.getOrSet(key: key) {
             let C = self.horizontalComplex(at: vCoords, slice: slice)
@@ -97,7 +100,7 @@ public struct KRHomology<R: HomologyCalculatable>: GradedModuleStructureType {
         return cube.asChainComplex()
     }
     
-    public func verticalHomology(hDegree h: Int, slice s: Int) -> ModuleGrid1<KR.TotalModule<R>> {
+    public func verticalHomology(hDegree h: Int, slice s: Int) -> VerticalHomology {
         let key = vKey(hDegree: h, slice: s)
         return verticalHomologyCache.getOrSet(key: key) {
             let C = verticalComplex(hDegree: h, slice: s)

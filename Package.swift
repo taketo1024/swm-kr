@@ -14,7 +14,7 @@ let package = Package(
     dependencies: [
         .package(
 			url: "https://github.com/taketo1024/swm-core.git",
-			from:"1.2.4"
+			from:"1.2.6"
 //            path: "../swm-core/"
 		),
         .package(
@@ -24,12 +24,12 @@ let package = Package(
 		),
         .package(
             url: "https://github.com/taketo1024/swm-homology.git",
-            from: "1.2.4"
+            from: "1.3.0"
 //            path: "../swm-homology/"
 		),
         .package(
             url: "https://github.com/taketo1024/swm-khovanov.git",
-            from: "1.1.4"
+            from: "1.1.5"
 //            path: "../swm-khovanov/"
         ),
     ],
@@ -43,7 +43,6 @@ let package = Package(
                 .product(name: "SwmKhovanov", package: "swm-khovanov"),
             ]
         ),
-//        .target (name: "Sample", dependencies: ["SwmKR"]),
         .testTarget(
             name: "SwmKRTests",
             dependencies: ["SwmKR"]

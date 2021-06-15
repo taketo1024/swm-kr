@@ -32,8 +32,8 @@ public struct KR {
     public typealias Grading = MultiIndex<_3>
     public typealias EdgeRing<R: Ring> = MultivariatePolynomial<R, Indeterminates.xn>
     public typealias BaseModule<R: Ring> = LinearCombination<R, MonomialAsGenerator<Indeterminates.xn>>
-    public typealias HorizontalModule<R: Ring> = GradedModule<Cube.Coords, BaseModule<R>>
-    public typealias TotalModule<R: Ring> = GradedModule<Cube.Coords, HorizontalModule<R>>
+    public typealias HorizontalModule<R: Ring> = IndexedModule<Cube.Coords, BaseModule<R>>
+    public typealias TotalModule<R: Ring> = IndexedModule<Cube.Coords, HorizontalModule<R>>
     
     public typealias qPolynomial<R: Ring>  = LaurentPolynomial<R, Indeterminates.q>
     public typealias qaPolynomial<R: Ring> = MultivariateLaurentPolynomial<R, Indeterminates.qa>
