@@ -23,6 +23,11 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
     private let vertexCache: Cache<Coords, Vertex> = .empty
     private let   edgeCache: Cache<Coords, Edge>   = .empty
     
+    init(link L: Link, vCoords: Coords, slice: Int) {
+        let conn = KREdgeConnection<R>(L).compute()
+        self.init(link: L, vCoords: vCoords, slice: slice, connection: conn)
+    }
+    
     init(link L: Link, vCoords: Coords, slice: Int, connection: [Int : KR.EdgeConnection<R>]) {
         self.L = L
         self.vCoords = vCoords
@@ -86,6 +91,15 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
             return .init { z -> BaseModule in
                 let q = MultivariatePolynomial(z)
                 return e * (p * q).asLinearCombination
+            }
+        }
+    }
+    
+    func printDescription() {
+        for v in BitSequence.allSequences(length: dim) {
+            print(v, ":", self[v].generators)
+            for w in v.successors {
+                print("\t->", w, ":", edge(from: v, to: w).callAsFunction(.unit))
             }
         }
     }
