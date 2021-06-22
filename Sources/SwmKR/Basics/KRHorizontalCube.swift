@@ -177,8 +177,69 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
     }
     
     func recover(cycle: IndexedModule<Coords, BaseModule>) -> IndexedModule<Coords, BaseModule> {
-        // TODO
-        .zero
+        typealias M = IndexedModule<Coords, BaseModule>
+        typealias P = KR.EdgeRing<R>
+        
+        var z = cycle
+        var step = exclusions.count - 1
+        var dirs = (0 ..< dim).subtract(excludedDirections)
+
+        print("recover: \(z)")
+        print("exclusions: \(exclusions.map{ (d, f, i, _) in (d, i, f) })")
+        print()
+
+        for (r, f, i, _) in exclusions.reversed() {
+            assert(z.elements.allSatisfy{ (v, _) in v[r] == 1 })
+            
+            print("step: \(step), r: \(r), i: \(i), f: \(f)")
+            print("z = \(z)")
+                        
+            let z0 = z.map { (v, x) in
+                (v.replaced(with: 0, at: r), x)
+            }
+            let dz0 = differentiate(z0, step: step - 1, movableDirs: dirs)
+            let w = dz0.mapValues{ P($0).divide(by: f, as: i).asLinearCombination }
+            
+            print("w =", w)
+            z = (z + w).reduced
+//            z = (z + M(elements: divided.mapValues{ $0.asLinearCombination })).reduced
+
+            print("z = \(z)")
+            
+            step -= 1
+            dirs.append(r)
+            
+            let dz = differentiate(z, step: step, movableDirs: dirs)
+            print("dz = ", dz.elements)
+            assert(dz.isZero)
+            
+            print()
+        }
+        
+        assert(differentiate(z, step: -1, movableDirs: (0 ..< dim).toArray()).isZero)
+        return z
+    }
+    
+    private func differentiate(_ z: IndexedModule<Coords, BaseModule>, step: Int, movableDirs: [Int]) -> IndexedModule<Coords, BaseModule> {
+        typealias P = KR.EdgeRing<R>
+        print("dirs:", movableDirs)
+        let s = z.elements.map { (v, x) in
+            v.enumerated().filter { (i, b) in
+                movableDirs.contains(i) && b == 0
+            }.sum { (r, b) -> IndexedModule<Coords, BaseModule> in
+                let e = R(from: (0 ..< r).count { i in
+                    movableDirs.contains(i) && v[i] == 1
+                }.isEven ? 1 : -1)
+                let w = v.replaced(with: 1, at: r)
+//                let e = edgeSign(from: v, to: w)
+                let f = edgeFactor(r, step: step)
+                print(e, f)
+                let y = e * f * P(x)
+                return .init(index: w, value: y.asLinearCombination)
+            }
+        }
+        print(s)
+        return s.sum()
     }
     
     func printDescription() {
