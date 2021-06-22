@@ -23,6 +23,7 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
     private var exclusions: [(
         direction: Int,
         factor: KR.EdgeRing<R>,
+        exclude: Int,
         table: [Int: KR.EdgeRing<R>]
     )]
     private let vertexCache: Cache<Coords, Vertex> = .empty
@@ -66,12 +67,15 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
                 let i = f.leadTerm.indexOfIndeterminate
                 let y = -a.inverse! * (f - f.leadTerm)
                 
+//                print("dir: \(c), exclude: \(P.indeterminate(i)), f: \(f)")
+                
                 table = table.mapValues{ $0.substitute([i : y]).reduced }
                 table[i] = y
                 
                 exclusions.append((
                     direction: c,
                     factor: f,
+                    exclude: i,
                     table: table
                 ))
             }
@@ -121,6 +125,10 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
         return ModuleStructure<BaseModule>(rawGenerators: mons)
     }
     
+    private var excludedDirections: Set<Int> {
+        Set(exclusions.map{ $0.direction })
+    }
+    
     private var excludedIndeterminates: Set<Int> {
         if let indices = exclusions.last?.table.keys {
             return Set(indices)
@@ -130,7 +138,7 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
     }
     
     private func exclude(_ f: KR.EdgeRing<R>, step: Int? = nil) -> KR.EdgeRing<R> {
-        let table = step.map{ exclusions[$0].table }
+        let table = step.map{ i in i >= 0 ? exclusions[i].table : [:] }
             ?? exclusions.last?.table
             ?? [:]
         
@@ -156,15 +164,11 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
     }
     
     func edge(from: Coords, to: Coords) -> ModuleEnd<BaseModule> {
-        edge(from: from, to: to, step: nil)
-    }
-    
-    func edge(from: Coords, to: Coords, step: Int?) -> ModuleEnd<BaseModule> {
         assert((to - from).weight == 1)
         return edgeCache.getOrSet(key: from.concat(with: to)) {
             let e = edgeSign(from: from, to: to)
             let i = (to - from).enumerated().first { (_, b) in b == 1 }!.offset
-            let p = edgeFactor(i, step: step)
+            let p = edgeFactor(i)
             return .init { z -> BaseModule in
                 let q = MultivariatePolynomial(z)
                 return e * (p * q).asLinearCombination
