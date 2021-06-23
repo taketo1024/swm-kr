@@ -22,10 +22,12 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
     
     private var exclusions: [(
         direction: Int,
-        exclude: Int,
-        divisor: KR.EdgeRing<R>,
-        table: [Int: KR.EdgeRing<R>] // TODO remove this
+        excluded: Int,
+        divisor: KR.EdgeRing<R>
     )]
+    private var exclusionTable: [Int: KR.EdgeRing<R>]
+    private var edgeFactors: [[Int: KR.EdgeRing<R>]]
+    
     private let vertexCache: Cache<Coords, Vertex> = .empty
     private let   edgeCache: Cache<Coords, Edge>   = .empty
     
@@ -41,9 +43,16 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
         self.connection = connection
         
         self.exclusions = []
+        self.exclusionTable = [:]
+        self.edgeFactors = []
         
         if exclusion {
             self.excludeIndeterminates()
+        } else {
+            // TODO
+            edgeFactors = [Dictionary(keys: 0 ..< dim) { r in
+                edgeFactor(r)
+            }]
         }
     }
     
@@ -54,10 +63,15 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
         typealias P = KR.EdgeRing<R>
         
         let n = L.crossingNumber
+        var factors = Dictionary(keys: 0 ..< dim) { r in
+            edgeFactor(r)
+        }
         var table: [Int: KR.EdgeRing<R>] = .empty
         
+        edgeFactors.append(factors)
+        
         for r in 0 ..< n {
-            let f = edgeFactor(r)
+            let f = factors[r]!
             if f.isLinear && f.degree == 2 { // recall: each xi has deg = 2.
                 
                 // f = a x_i + (terms) ~ 0
@@ -72,14 +86,20 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
                 table = table.mapValues{ $0.substitute([i : y]).reduced }
                 table[i] = y
                 
+                factors[r] = nil
+                factors = factors.mapValues { $0.substitute([i : y]) }
+                
                 exclusions.append((
                     direction: r,
-                    exclude: i,
-                    divisor: f,
-                    table: table
+                    excluded: i,
+                    divisor: f
                 ))
+                
+                edgeFactors.append(factors)
             }
         }
+        
+        self.exclusionTable = table
     }
     
     var dim: Int {
@@ -130,40 +150,25 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
     }
     
     private var excludedIndeterminates: Set<Int> {
-        if let indices = exclusions.last?.table.keys {
-            return Set(indices)
-        } else {
-            return []
-        }
+        Set(exclusions.map{ $0.excluded })
     }
     
-    private func exclude(_ f: KR.EdgeRing<R>, level: Int? = nil) -> KR.EdgeRing<R> {
-        let table: [Int: KR.EdgeRing<R>]
-        if let level = level {
-            table = (level >= 0) ? exclusions[level].table : [:]
-        } else {
-            table = exclusions.last?.table ?? [:]
-        }
-        
-        return table.isEmpty ? f : f.substitute(table)
+    private func exclude(_ f: KR.EdgeRing<R>) -> KR.EdgeRing<R> {
+        f.substitute(exclusionTable)
     }
     
-    private func edgeFactor(_ r: Int, exclusionLevel: Int? = nil) -> KR.EdgeRing<R> {
+    private func edgeFactor(_ r: Int) -> KR.EdgeRing<R> {
         let c = connection[r]!
         let (ik, il) = (c.ik, c.il)
         
-        let f = { () -> KR.EdgeRing<R> in
-            switch (L.crossings[r].crossingSign, vCoords[r]) {
-            case (+1, 0), (-1, 1):
-                return ik * il
-            case (+1, 1), (-1, 0):
-                return ik
-            default:
-                fatalError("impossible")
-            }
-        }()
-
-        return exclude(f, level: exclusionLevel)
+        switch (L.crossings[r].crossingSign, vCoords[r]) {
+        case (+1, 0), (-1, 1):
+            return ik * il
+        case (+1, 1), (-1, 0):
+            return ik
+        default:
+            fatalError("impossible")
+        }
     }
     
     func edge(from: Coords, to: Coords) -> ModuleEnd<BaseModule> {
@@ -171,7 +176,7 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
         return edgeCache.getOrSet(key: from.concat(with: to)) {
             let e = edgeSign(from: from, to: to)
             let r = (to - from).enumerated().first { (_, b) in b == 1 }!.offset
-            let p = edgeFactor(r)
+            let p = exclude(edgeFactor(r))
             return .init { z -> BaseModule in
                 let q = MultivariatePolynomial(z)
                 return e * (p * q).asLinearCombination
@@ -214,7 +219,7 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
 //        print("exclusions: \(exclusions.map{ (d, f, i, _) in (d, i, f) })")
 //        print()
 
-        for (r, i, f, _) in exclusions.reversed() {
+        for (r, i, f) in exclusions.reversed() {
             // one step back in direction: r.
             let z0 = z.map { (v, x) in
                 let u = v.replaced(with: 0, at: r)
@@ -225,7 +230,7 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
             // w = d'(z0) / f.
             let w = differentiate(
                 z0,
-                step: step - 1,
+                step: step,
                 movableDirs: dirs
             ).mapValues{
                 P($0).divide(by: f, as: i).asLinearCombination
@@ -252,13 +257,14 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
     private func differentiate(_ z: IndexedModule<Coords, BaseModule>, step: Int, movableDirs: [Int]) -> IndexedModule<Coords, BaseModule> {
         typealias P = KR.EdgeRing<R>
         
+        let factors = edgeFactors[step]
         return z.elements.sum { (v, x) in
             v.enumerated().filter { (i, b) in
                 movableDirs.contains(i) && b == 0
             }.sum { (r, b) -> IndexedModule<Coords, BaseModule> in
                 let w = v.replaced(with: 1, at: r)
                 let e = edgeSign(from: v, to: w)
-                let f = edgeFactor(r, exclusionLevel: step)
+                let f = factors[r]!
                 let y = e * f * P(x)
                 return .init(index: w, value: y.asLinearCombination)
             }

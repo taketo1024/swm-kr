@@ -19,8 +19,12 @@ extension MultivariatePolynomialType {
     }
     
     func substitute(_ table: [Int : Self]) -> Self {
-        let p = RingHom.mapping { i in table[i] }
-        return p(self)
+        if table.isEmpty {
+            return self
+        } else {
+            let p = RingHom.mapping { i in table[i] }
+            return p(self)
+        }
     }
     
     private func highestExponent(as i: Int) -> Exponent {
