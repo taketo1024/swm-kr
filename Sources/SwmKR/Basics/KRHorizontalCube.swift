@@ -22,9 +22,9 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
     
     private var exclusions: [(
         direction: Int,
-        factor: KR.EdgeRing<R>,
         exclude: Int,
-        table: [Int: KR.EdgeRing<R>]
+        divisor: KR.EdgeRing<R>,
+        table: [Int: KR.EdgeRing<R>] // TODO remove this
     )]
     private let vertexCache: Cache<Coords, Vertex> = .empty
     private let   edgeCache: Cache<Coords, Edge>   = .empty
@@ -56,8 +56,8 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
         let n = L.crossingNumber
         var table: [Int: KR.EdgeRing<R>] = .empty
         
-        for c in 0 ..< n {
-            let f = edgeFactor(c)
+        for r in 0 ..< n {
+            let f = edgeFactor(r)
             if f.isLinear && f.degree == 2 { // recall: each xi has deg = 2.
                 
                 // f = a x_i + (terms) ~ 0
@@ -73,9 +73,9 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
                 table[i] = y
                 
                 exclusions.append((
-                    direction: c,
-                    factor: f,
+                    direction: r,
                     exclude: i,
+                    divisor: f,
                     table: table
                 ))
             }
@@ -107,8 +107,9 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
             return .zeroModule
         }
         
-        if v.enumerated().contains(where: { (i, b) in
-            exclusions.contains(where: { $0.direction == i }) && b == 0
+        let excDirs = excludedDirections
+        if v.enumerated().contains(where: { (r, b) in
+            excDirs.contains(r) && b == 0
         }) {
             return .zeroModule
         }
@@ -147,12 +148,12 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
         return table.isEmpty ? f : f.substitute(table)
     }
     
-    private func edgeFactor(_ i: Int, exclusionLevel: Int? = nil) -> KR.EdgeRing<R> {
-        let c = connection[i]!
+    private func edgeFactor(_ r: Int, exclusionLevel: Int? = nil) -> KR.EdgeRing<R> {
+        let c = connection[r]!
         let (ik, il) = (c.ik, c.il)
         
         let f = { () -> KR.EdgeRing<R> in
-            switch (L.crossings[i].crossingSign, vCoords[i]) {
+            switch (L.crossings[r].crossingSign, vCoords[r]) {
             case (+1, 0), (-1, 1):
                 return ik * il
             case (+1, 1), (-1, 0):
@@ -169,8 +170,8 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
         assert((to - from).weight == 1)
         return edgeCache.getOrSet(key: from.concat(with: to)) {
             let e = edgeSign(from: from, to: to)
-            let i = (to - from).enumerated().first { (_, b) in b == 1 }!.offset
-            let p = edgeFactor(i)
+            let r = (to - from).enumerated().first { (_, b) in b == 1 }!.offset
+            let p = edgeFactor(r)
             return .init { z -> BaseModule in
                 let q = MultivariatePolynomial(z)
                 return e * (p * q).asLinearCombination
@@ -185,9 +186,11 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
         }
         
         typealias P = KR.EdgeRing<R>
+        
+        let excDirs = excludedDirections
         return cycle.filter{ (v, x) in
-            !v.enumerated().contains(where: { (i, b) in
-                exclusions.contains(where: { $0.direction == i }) && b == 0
+            !v.enumerated().contains(where: { (r, b) in
+                excDirs.contains(r) && b == 0
             })
         }.mapValues { x in
             exclude(P(x)).asLinearCombination
@@ -211,7 +214,7 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
 //        print("exclusions: \(exclusions.map{ (d, f, i, _) in (d, i, f) })")
 //        print()
 
-        for (r, f, i, _) in exclusions.reversed() {
+        for (r, i, f, _) in exclusions.reversed() {
             // one step back in direction: r.
             let z0 = z.map { (v, x) in
                 let u = v.replaced(with: 0, at: r)
@@ -248,6 +251,7 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
     
     private func differentiate(_ z: IndexedModule<Coords, BaseModule>, step: Int, movableDirs: [Int]) -> IndexedModule<Coords, BaseModule> {
         typealias P = KR.EdgeRing<R>
+        
         return z.elements.sum { (v, x) in
             v.enumerated().filter { (i, b) in
                 movableDirs.contains(i) && b == 0
