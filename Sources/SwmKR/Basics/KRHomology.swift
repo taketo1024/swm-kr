@@ -20,6 +20,7 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
 
     public let L: Link
     public let normalized: Bool
+    public let exclusion: Bool
     
     private let gradingShift: KR.Grading
     private var connection: [Int : KR.EdgeConnection<R>]
@@ -27,12 +28,13 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
     private let horizontalHomologyCache: Cache<hKey, HorizontalHomology> = .empty
     private let verticalHomologyCache: Cache<vKey, VerticalHomology> = .empty
 
-    public init(_ L: Link, normalized: Bool = true) {
+    public init(_ L: Link, normalized: Bool = true, exclusion: Bool = true) {
         let w = L.writhe
         let b = L.resolved(by: L.orientationPreservingState).components.count
         
         self.L = L
         self.normalized = normalized
+        self.exclusion = exclusion
         self.gradingShift = normalized ? [-w + b - 1, w + b - 1, w - b + 1] : .zero
         self.connection = KREdgeConnection(L).compute()
     }
@@ -80,15 +82,15 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
     }
     
     public func horizontalComplex(at vCoords: Cube.Coords, slice: Int) -> ChainComplex1<KR.HorizontalModule<R>> {
-        let cube = KRHorizontalCube(link: L, vCoords: vCoords, slice: slice, connection: connection)
+        let cube = KRHorizontalCube(link: L, vCoords: vCoords, slice: slice, connection: connection, exclusion: exclusion)
         return cube.asChainComplex()
     }
     
     public func horizontalHomology(at vCoords: Cube.Coords, slice: Int) -> HorizontalHomology {
         let key = hKey(vCoords: vCoords, slice: slice)
         return horizontalHomologyCache.getOrSet(key: key) {
-            let C = self.horizontalComplex(at: vCoords, slice: slice)
-            return C.homology()
+            let cube = KRHorizontalCube(link: L, vCoords: vCoords, slice: slice, connection: connection, exclusion: exclusion)
+            return cube.homology()
         }
     }
     

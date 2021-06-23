@@ -32,22 +32,14 @@ extension MultivariatePolynomialType {
     }
     
     func divide(by g: Self, as i: Int) -> Self {
-//        print("\t\tdivide \(self) / \(g)")
-
         var f = self
         var q = Self.zero
         let e0 = g.highestExponent(as: i)
         let a0 = g.coeff(e0)
         
-        assert(!e0.isZero)
-        
         while !f.isZero {
-//            print("\t\t\tdivide \(f) / \(g)")
             let e1 = f.highestExponent(as: i)
             let e = e1 - e0
-            assert(e1 != .zero)
-            assert(e.indices.allSatisfy{ $0 >= 0 })
-            
             let a = f.coeff(e1) * a0.inverse!
             let x = a * Self.monomial(withExponents: e)
             
@@ -55,7 +47,6 @@ extension MultivariatePolynomialType {
             q = q + x
         }
         
-        assert(self == q * g)
         return q
     }
 }
