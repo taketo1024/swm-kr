@@ -176,7 +176,7 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
         return edgeCache.getOrSet(key: from.concat(with: to)) {
             let e = edgeSign(from: from, to: to)
             let r = (to - from).enumerated().first { (_, b) in b == 1 }!.offset
-            let p = exclude(edgeFactor(r))
+            let p = edgeFactors.last![r]!
             return .init { z -> BaseModule in
                 let q = MultivariatePolynomial(z)
                 return e * (p * q).asLinearCombination
@@ -213,7 +213,6 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
         
         var z = cycle
         var step = exclusions.count - 1
-        var dirs = (0 ..< dim).subtract(excludedDirections)
 
 //        print("compute psi of \(z)")
 //        print("exclusions: \(exclusions.map{ (d, f, i, _) in (d, i, f) })")
@@ -228,39 +227,36 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
             }
 
             // w = d'(z0) / f.
-            let w = differentiate(
-                z0,
-                step: step,
-                movableDirs: dirs
-            ).mapValues{
+            let w = differentiate(z0, step).mapValues{
                 P($0).divide(by: f, as: i).asLinearCombination
             }
             
-            z = (z + w).reduced
-
 //            print("step: \(step), r: \(r), i: \(i), f: \(f)")
 //            print("z = \(z)")
 //            print("\t-> \(z0)")
-//            print("\t-> \(w)")
-//            print("z = \(z)\n")
-
+//            print("\t-> \(w)\n")
+            
+            z = (z + w).reduced
+            
             step -= 1
-            dirs.append(r)
         }
         
+//        print("z = \(z)")
 //        assert(collapse(cycle: z) == cycle)
 //        assert(differentiate(z, step: -1, movableDirs: (0 ..< dim).toArray()).isZero)
         
         return z
     }
     
-    private func differentiate(_ z: IndexedModule<Coords, BaseModule>, step: Int, movableDirs: [Int]) -> IndexedModule<Coords, BaseModule> {
+    private func differentiate(_ z: IndexedModule<Coords, BaseModule>, _ step: Int) -> IndexedModule<Coords, BaseModule> {
         typealias P = KR.EdgeRing<R>
         
+        let r0 = exclusions[step].direction
         let factors = edgeFactors[step]
+        
         return z.elements.sum { (v, x) in
-            v.enumerated().filter { (i, b) in
-                movableDirs.contains(i) && b == 0
+            v.enumerated().filter { (r, b) in
+                r != r0 && factors.contains(key: r) && b == 0
             }.sum { (r, b) -> IndexedModule<Coords, BaseModule> in
                 let w = v.replaced(with: 1, at: r)
                 let e = edgeSign(from: v, to: w)
