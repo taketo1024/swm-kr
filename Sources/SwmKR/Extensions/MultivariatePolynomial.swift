@@ -64,10 +64,10 @@ extension RingHom where Domain: MultivariatePolynomialType, Domain == Codomain {
                     if let y = f(i) {
                         return y.pow(e_i) // map x_i^e_i ↦ y^e_i.
                     } else {
-                        return .indeterminate(i).pow(e_i) // keep x_i^e_i.
+                        return .indeterminate(i, exponent: e_i) // keep x_i^e_i.
                     }
                 }
-            }.reduced
+            }
         }
     }
 }
