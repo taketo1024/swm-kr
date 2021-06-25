@@ -226,61 +226,50 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
             typealias M = IndexedModule<Coords, BaseModule>
             typealias P = KR.EdgeRing<R>
             
-            var z = cycle
             var step = path.count - 1
-
-//            print("compute psi of \(z)")
-//            print("exclusions: \(exclusions.map{ (d, f, i, _) in (d, i, f) })")
-//            print()
+            var z = Dictionary(keys: cycle.elements.keys) { v in
+                P(cycle.elements[v]!)
+            }
 
             for (r, i, f) in path.reversed() {
                 // one step back in direction: r.
-                let z0 = z.map { (v, x) in
+                let z0 = z.mapPairs { (v, x) -> (Coords, P) in
                     let u = v.replaced(with: 0, at: r)
                     let e = Cube.edgeSign(from: u, to: v)
                     return (u, e * x)
                 }
 
                 // w = d'(z0) / f.
-                let w = differentiate(z0, step).mapValues {
-                    let (q, r) = P($0).divide(by: f, as: i)
-                    assert(r.isZero)
-                    return q.asLinearCombination
+                let w = differentiate(z0, step).mapValues { x in
+                    x.divide(by: f, as: i).quotient
                 }
                 
-//                print("step: \(step), r: \(r), i: \(i), f: \(f)")
-//                print("z = \(z)")
-//                print("\t-> \(z0)")
-//                print("\t-> \(w)\n")
-                
-                z = (z + w).reduced
-                
+                z = z.merging(w, uniquingKeysWith: +)
                 step -= 1
             }
             
-//            print("z = \(z)")
-//            assert(collapse(cycle: z) == cycle)
-            
-            return z
+            return .init(elements: z.mapValues{ $0.asLinearCombination })
         }
         
-        private func differentiate(_ z: IndexedModule<Coords, BaseModule>, _ step: Int) -> IndexedModule<Coords, BaseModule> {
+        private func differentiate(_ z: [Coords : KR.EdgeRing<R>], _ step: Int) -> [Coords : KR.EdgeRing<R>] {
             typealias P = KR.EdgeRing<R>
             
             let r0 = path[step].direction
-            let factors = factors[step]
+            let factors = self.factors[step]
             
-            return z.elements.sum { (v, x) in
-                v.enumerated().filter { (r, b) in
-                    r != r0 && factors.contains(key: r) && b == 0
-                }.sum { (r, b) -> IndexedModule<Coords, BaseModule> in
+            let elements = z.flatMap { (v, x) -> [(Coords, KR.EdgeRing<R>)] in
+                v.enumerated().compactMap { (r, b) in
+                    if r == r0 || !(factors.contains(key: r) && b == 0) {
+                        return nil
+                    }
                     let w = v.replaced(with: 1, at: r)
                     let e = Cube.edgeSign(from: v, to: w)
                     let f = factors[r]!
-                    let y = e * f * P(x)
-                    return .init(index: w, value: y.asLinearCombination)
+                    let y = e * f * x
+                    return (w, y)
                 }
             }
+            return Dictionary(elements, uniquingKeysWith: +)
         }
     }
 }
