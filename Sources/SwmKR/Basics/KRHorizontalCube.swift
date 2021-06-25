@@ -19,14 +19,7 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
     let vCoords: Coords // Cubic coord in Cube2
     let slice: Int
     let connection: [Int : KR.EdgeConnection<R>]
-    
-    private var exclusions: [(
-        direction: Int,
-        excluded: Int,
-        divisor: KR.EdgeRing<R>
-    )]
-    private var exclusionTable: [Int: KR.EdgeRing<R>]
-    private var edgeFactors: [[Int: KR.EdgeRing<R>]]
+    var exclusion: Exclusion
     
     private let vertexCache: Cache<Coords, Vertex> = .empty
     private let   edgeCache: Cache<Coords, Edge>   = .empty
@@ -41,57 +34,11 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
         self.vCoords = vCoords
         self.slice = slice
         self.connection = connection
-        
-        self.exclusions = []
-        self.exclusionTable = [:]
-        self.edgeFactors = []
+        self.exclusion = .empty
         
         if exclusion {
-            self.excludeIndeterminates()
-        } else {
-            // TODO
-            edgeFactors = [Dictionary(keys: 0 ..< dim) { r in
-                edgeFactor(r)
-            }]
+            self.exclusion = Exclusion(self)
         }
-    }
-    
-    //           f
-    //  Cone( R ---> R )  ==>  Cone( 0 ---> R/f )
-    
-    mutating func excludeIndeterminates() {
-        typealias P = KR.EdgeRing<R>
-        
-        let n = L.crossingNumber
-        var factors = Dictionary(keys: 0 ..< dim) { r in
-            edgeFactor(r)
-        }
-        var table: [Int: KR.EdgeRing<R>] = .empty
-        
-        edgeFactors.append(factors)
-        
-        for r in 0 ..< n {
-            let f = factors[r]!
-            if f.isLinear && f.degree == 2 { // recall: each xi has deg = 2.
-                let i = f.leadTerm.indexOfIndeterminate
-
-                table[i] = .indeterminate(i)
-                table = table.mapValues{ $0.divide(by: f, as: i).remainder }
-                
-                factors[r] = nil
-                factors = factors.mapValues { $0.divide(by: f, as: i).remainder }
-                
-                exclusions.append((
-                    direction: r,
-                    excluded: i,
-                    divisor: f
-                ))
-                
-                edgeFactors.append(factors)
-            }
-        }
-        
-        self.exclusionTable = table
     }
     
     var dim: Int {
@@ -119,14 +66,14 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
             return .zeroModule
         }
         
-        let excDirs = excludedDirections
+        let excDirs = exclusion.excludedDirections
         if v.enumerated().contains(where: { (r, b) in
             excDirs.contains(r) && b == 0
         }) {
             return .zeroModule
         }
         
-        let remain = (0 ..< dim).subtract(excludedIndeterminates)
+        let remain = (0 ..< dim).subtract(exclusion.excludedIndeterminates)
         let mons = KR.EdgeRing<R>.monomials(
             ofDegree: 2 * deg,
             usingIndeterminates: remain
@@ -135,18 +82,6 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
         }
         
         return ModuleStructure<BaseModule>(rawGenerators: mons)
-    }
-    
-    private var excludedDirections: Set<Int> {
-        Set(exclusions.map{ $0.direction })
-    }
-    
-    private var excludedIndeterminates: Set<Int> {
-        Set(exclusions.map{ $0.excluded })
-    }
-    
-    private func exclude(_ f: KR.EdgeRing<R>) -> KR.EdgeRing<R> {
-        f.substitute(exclusionTable)
     }
     
     private func edgeFactor(_ r: Int) -> KR.EdgeRing<R> {
@@ -168,95 +103,10 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
         return edgeCache.getOrSet(key: from.concat(with: to)) {
             let e = edgeSign(from: from, to: to)
             let r = (to - from).enumerated().first { (_, b) in b == 1 }!.offset
-            let p = edgeFactors.last![r]!
+            let p = exclusion.exclude(edgeFactor(r))
             return .init { z -> BaseModule in
                 let q = MultivariatePolynomial(z)
                 return e * (p * q).asLinearCombination
-            }
-        }
-    }
-    
-    // z ↦ φ(z)
-    private func collapse(cycle: IndexedModule<Coords, BaseModule>) -> IndexedModule<Coords, BaseModule> {
-        if exclusions.isEmpty {
-            return cycle
-        }
-        
-        typealias P = KR.EdgeRing<R>
-        
-        let excDirs = excludedDirections
-        return cycle.filter{ (v, x) in
-            !v.enumerated().contains(where: { (r, b) in
-                excDirs.contains(r) && b == 0
-            })
-        }.mapValues { x in
-            exclude(P(x)).asLinearCombination
-        }
-    }
-    
-    // z ↦ ψ(z), chain homotopy inverse of φ.
-    private func expand(cycle: IndexedModule<Coords, BaseModule>) -> IndexedModule<Coords, BaseModule> {
-        if exclusions.isEmpty {
-            return cycle
-        }
-        
-        typealias M = IndexedModule<Coords, BaseModule>
-        typealias P = KR.EdgeRing<R>
-        
-        var z = cycle
-        var step = exclusions.count - 1
-
-//        print("compute psi of \(z)")
-//        print("exclusions: \(exclusions.map{ (d, f, i, _) in (d, i, f) })")
-//        print()
-
-        for (r, i, f) in exclusions.reversed() {
-            // one step back in direction: r.
-            let z0 = z.map { (v, x) in
-                let u = v.replaced(with: 0, at: r)
-                let e = edgeSign(from: u, to: v)
-                return (u, e * x)
-            }
-
-            // w = d'(z0) / f.
-            let w = differentiate(z0, step).mapValues {
-                let (q, r) = P($0).divide(by: f, as: i)
-                assert(r.isZero)
-                return q.asLinearCombination
-            }
-            
-//            print("step: \(step), r: \(r), i: \(i), f: \(f)")
-//            print("z = \(z)")
-//            print("\t-> \(z0)")
-//            print("\t-> \(w)\n")
-            
-            z = (z + w).reduced
-            
-            step -= 1
-        }
-        
-//        print("z = \(z)")
-//        assert(collapse(cycle: z) == cycle)
-//        assert(differentiate(z, step: -1, movableDirs: (0 ..< dim).toArray()).isZero)
-        
-        return z
-    }
-    
-    private func differentiate(_ z: IndexedModule<Coords, BaseModule>, _ step: Int) -> IndexedModule<Coords, BaseModule> {
-        typealias P = KR.EdgeRing<R>
-        
-        let r0 = exclusions[step].direction
-        let factors = edgeFactors[step]
-        
-        return z.elements.sum { (v, x) in
-            v.enumerated().filter { (r, b) in
-                r != r0 && factors.contains(key: r) && b == 0
-            }.sum { (r, b) -> IndexedModule<Coords, BaseModule> in
-                let w = v.replaced(with: 1, at: r)
-                let e = edgeSign(from: v, to: w)
-                let f = factors[r]!
-                let y = e * f * P(x)
-                return .init(index: w, value: y.asLinearCombination)
             }
         }
     }
@@ -270,6 +120,169 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
             }
         }
     }
+    
+    //  Simplify chain complex by iterating retractions:
+    //             f
+    //    Cone( R ---> R )  ==>  Cone( 0 ---> R/f )
+    //
+    
+    struct Exclusion {
+        typealias Cube = KRHorizontalCube<R>
+        
+        private typealias Step = (
+            direction: Int,
+            excluded: Int,
+            divisor: KR.EdgeRing<R>
+        )
+        
+        private var path: [Step]
+        private var table: [Int: KR.EdgeRing<R>]
+        private var factors: [[Int: KR.EdgeRing<R>]]
+        
+        private init(_ path: [Step], _ table: [Int: KR.EdgeRing<R>], _ factors: [[Int: KR.EdgeRing<R>]]) {
+            self.path = path
+            self.table = table
+            self.factors = factors
+        }
+        
+        init(_ cube: Cube) {
+            typealias P = KR.EdgeRing<R>
+            
+            var path: [Step] = []
+            var table: [Int: KR.EdgeRing<R>] = .empty
+            var factors: [[Int: KR.EdgeRing<R>]] = []
+            
+            let n = cube.dim
+            var current = Dictionary(keys: 0 ..< n) { r in
+                cube.edgeFactor(r)
+            }
+            
+            factors.append(current)
+            
+            for r in 0 ..< n {
+                let f = current[r]!
+                if f.isLinear && f.degree == 2 { // recall: each xi has deg = 2.
+                    let i = f.leadTerm.indexOfIndeterminate
+
+                    table[i] = .indeterminate(i)
+                    table = table.mapValues{ $0.divide(by: f, as: i).remainder }
+                    
+                    current[r] = nil
+                    current = current.mapValues { $0.divide(by: f, as: i).remainder }
+                    
+                    path.append((
+                        direction: r,
+                        excluded: i,
+                        divisor: f
+                    ))
+                    
+                    factors.append(current)
+                }
+            }
+            
+            self.init(path, table, factors)
+        }
+        
+        static var empty: Self {
+            .init([], [:], [])
+        }
+        
+        var excludedDirections: Set<Int> {
+            Set(path.map{ $0.direction })
+        }
+        
+        var excludedIndeterminates: Set<Int> {
+            Set(path.map{ $0.excluded })
+        }
+        
+        func exclude(_ f: KR.EdgeRing<R>) -> KR.EdgeRing<R> {
+            table.isEmpty ? f : f.substitute(table)
+        }
+        
+        // z ↦ φ(z)
+        func collapse(_ z: IndexedModule<Coords, BaseModule>) -> IndexedModule<Coords, BaseModule> {
+            if path.isEmpty {
+                return z
+            }
+            
+            typealias P = KR.EdgeRing<R>
+            
+            let excDirs = excludedDirections
+            return z.filter{ (v, x) in
+                !v.enumerated().contains(where: { (r, b) in
+                    excDirs.contains(r) && b == 0
+                })
+            }.mapValues { x in
+                exclude(P(x)).asLinearCombination
+            }
+        }
+        
+        // z ↦ ψ(z), chain homotopy inverse of φ.
+        func expand(cycle: IndexedModule<Coords, BaseModule>) -> IndexedModule<Coords, BaseModule> {
+            if path.isEmpty {
+                return cycle
+            }
+            
+            typealias M = IndexedModule<Coords, BaseModule>
+            typealias P = KR.EdgeRing<R>
+            
+            var z = cycle
+            var step = path.count - 1
+
+//            print("compute psi of \(z)")
+//            print("exclusions: \(exclusions.map{ (d, f, i, _) in (d, i, f) })")
+//            print()
+
+            for (r, i, f) in path.reversed() {
+                // one step back in direction: r.
+                let z0 = z.map { (v, x) in
+                    let u = v.replaced(with: 0, at: r)
+                    let e = Cube.edgeSign(from: u, to: v)
+                    return (u, e * x)
+                }
+
+                // w = d'(z0) / f.
+                let w = differentiate(z0, step).mapValues {
+                    let (q, r) = P($0).divide(by: f, as: i)
+                    assert(r.isZero)
+                    return q.asLinearCombination
+                }
+                
+//                print("step: \(step), r: \(r), i: \(i), f: \(f)")
+//                print("z = \(z)")
+//                print("\t-> \(z0)")
+//                print("\t-> \(w)\n")
+                
+                z = (z + w).reduced
+                
+                step -= 1
+            }
+            
+//            print("z = \(z)")
+//            assert(collapse(cycle: z) == cycle)
+            
+            return z
+        }
+        
+        private func differentiate(_ z: IndexedModule<Coords, BaseModule>, _ step: Int) -> IndexedModule<Coords, BaseModule> {
+            typealias P = KR.EdgeRing<R>
+            
+            let r0 = path[step].direction
+            let factors = factors[step]
+            
+            return z.elements.sum { (v, x) in
+                v.enumerated().filter { (r, b) in
+                    r != r0 && factors.contains(key: r) && b == 0
+                }.sum { (r, b) -> IndexedModule<Coords, BaseModule> in
+                    let w = v.replaced(with: 1, at: r)
+                    let e = Cube.edgeSign(from: v, to: w)
+                    let f = factors[r]!
+                    let y = e * f * P(x)
+                    return .init(index: w, value: y.asLinearCombination)
+                }
+            }
+        }
+    }
 }
 
 extension KRHorizontalCube where R: HomologyCalculatable {
@@ -280,9 +293,9 @@ extension KRHorizontalCube where R: HomologyCalculatable {
         return .init(support: H.support) { i -> ModuleStructure<KR.HorizontalModule<R>> in
             let Hi = H[i]
             return .init(
-                generators: Hi.generators.map{ expand(cycle: $0) },
+                generators: Hi.generators.map{ exclusion.expand(cycle: $0) },
                 vectorizer: { z in
-                    Hi.vectorize( collapse(cycle: z) )
+                    Hi.vectorize( exclusion.collapse(z) )
                 }
             )
         }
