@@ -73,21 +73,13 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
         for r in 0 ..< n {
             let f = factors[r]!
             if f.isLinear && f.degree == 2 { // recall: each xi has deg = 2.
-                
-                // f = a x_i + (terms) ~ 0
-                // <=> x_i ~ -a^-1 (terms)
-                
-                let a = f.leadCoeff
                 let i = f.leadTerm.indexOfIndeterminate
-                let y = -a.inverse! * (f - f.leadTerm)
-                
-//                print("exclude: \(P.indeterminate(i)), f = \(f)")
-                
-                table = table.mapValues{ $0.substitute([i : y]).reduced }
-                table[i] = y
+
+                table[i] = .indeterminate(i)
+                table = table.mapValues{ $0.divide(by: f, as: i).remainder }
                 
                 factors[r] = nil
-                factors = factors.mapValues { $0.substitute([i : y]) }
+                factors = factors.mapValues { $0.divide(by: f, as: i).remainder }
                 
                 exclusions.append((
                     direction: r,
@@ -227,8 +219,10 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
             }
 
             // w = d'(z0) / f.
-            let w = differentiate(z0, step).mapValues{
-                P($0).divide(by: f, as: i).asLinearCombination
+            let w = differentiate(z0, step).mapValues {
+                let (q, r) = P($0).divide(by: f, as: i)
+                assert(r.isZero)
+                return q.asLinearCombination
             }
             
 //            print("step: \(step), r: \(r), i: \(i), f: \(f)")

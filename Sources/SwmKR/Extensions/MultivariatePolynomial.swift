@@ -35,23 +35,28 @@ extension MultivariatePolynomialType {
         ?? .zero
     }
     
-    func divide(by g: Self, as i: Int) -> Self {
-        var f = self
-        var q = Self.zero
+    func divide(by g: Self, as i: Int) -> (quotient: Self, remainder: Self) {
         let e0 = g.highestExponent(as: i)
         let a0 = g.coeff(e0)
         
-        while !f.isZero {
-            let e1 = f.highestExponent(as: i)
+        var q = Self.zero
+        var r = self
+        
+        while !r.isZero {
+            let e1 = r.highestExponent(as: i)
             let e = e1 - e0
-            let a = f.coeff(e1) * a0.inverse!
+            if e.indices.contains(where: {$0 < 0} ) {
+                break
+            }
+            
+            let a = r.coeff(e1) * a0.inverse!
             let x = a * Self.monomial(withExponents: e)
             
-            f = f - x * g
+            r = r - x * g
             q = q + x
         }
         
-        return q
+        return (q, r)
     }
 }
 
