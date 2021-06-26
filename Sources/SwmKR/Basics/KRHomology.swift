@@ -97,6 +97,9 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
     public func verticalComplex(hDegree h: Int, slice s: Int) -> ChainComplex1<KR.TotalModule<R>> {
         let cube = KRTotalCube<R>(link: L, connection: connection) { vCoords -> KRTotalCube<R>.Vertex in
             let H = horizontalHomology(at: vCoords, slice: s)
+            if !H[h].isFree {
+                fatalError("Horizontal homology at \(vCoords) is non-free.")
+            }
             return H[h]
         }
         return cube.asChainComplex()
