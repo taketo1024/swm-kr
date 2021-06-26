@@ -38,12 +38,7 @@ internal struct KRTotalCube<R: Ring>: ModuleCube {
         }
     }
     
-    private func edgeFactor(from: Coords, to: Coords, subcoords: Coords) -> KR.EdgeRing<R> {
-        assert((to - from).weight == 1)
-        guard let p = (to - from).enumerated().first(where: { (_, b) in b == 1})?.offset else {
-            fatalError()
-        }
-        
+    private func edgeFactor(_ p: Int, subcoords: Coords) -> KR.EdgeRing<R> {
         let il = connection[p]!.il
         
         switch (L.crossings[p].crossingSign, subcoords[p]) {
@@ -59,9 +54,11 @@ internal struct KRTotalCube<R: Ring>: ModuleCube {
     func edge(from: Coords, to: Coords) -> ModuleEnd<BaseModule> {
         edgeCache.getOrSet(key: from.concat(with: to)) {
             let e = edgeSign(from: from, to: to)
+            let i = (to - from).enumerated().first { (_, b) in b == 1 }!.offset
             return .init { x -> BaseModule in
                 x.elements.sum { (subcoords, z) -> BaseModule in
-                    let p = edgeFactor(from: from, to: to, subcoords: subcoords)
+                    
+                    let p = edgeFactor(i, subcoords: subcoords)
                     let q = MultivariatePolynomial(z)
                     return IndexedModule(
                         index: subcoords,

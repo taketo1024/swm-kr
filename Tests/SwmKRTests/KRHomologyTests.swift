@@ -17,6 +17,34 @@ class KRHomologyTests: XCTestCase {
     
     override func tearDown() {}
     
+    func testTrefoil_noExclusion() {
+        typealias R = 𝐐
+        
+        let K = Link.load("3_1")!
+        let H = KRHomology<R>(K, exclusion: false)
+        let str = H.structure()
+        
+        XCTAssertEqual(str.count, 3)
+        XCTAssertEqual(str[[0, -4, 2]]!.rank, 1)
+        XCTAssertEqual(str[[-2, -2, 2]]!.rank, 1)
+        XCTAssertEqual(str[[2, -2, -2]]!.rank, 1)
+    }
+    
+    func testFigureEight_noExclusion() {
+        typealias R = 𝐐
+        
+        let K = Link.load("4_1")!
+        let H = KRHomology<R>(K, exclusion: false)
+        let str = H.structure()
+        
+        XCTAssertEqual(str.count, 5)
+        XCTAssertEqual(str[[2, 0, -2]]!.rank, 1)
+        XCTAssertEqual(str[[-2, 0, 2]]!.rank, 1)
+        XCTAssertEqual(str[[0, 2, -2]]!.rank, 1)
+        XCTAssertEqual(str[[0, -2, 2]]!.rank, 1)
+        XCTAssertEqual(str[[0, 0, 0]]!.rank, 1)
+    }
+
     func testTrefoil() {
         typealias R = 𝐐
         
