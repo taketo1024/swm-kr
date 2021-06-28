@@ -106,13 +106,17 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
     func edge(from: Coords, to: Coords) -> ModuleEnd<BaseModule> {
         assert((to - from).weight == 1)
         return edgeCache.getOrSet(key: from.concat(with: to)) {
-            let e = edgeSign(from: from, to: to)
             let r = (to - from).enumerated().first { (_, b) in b == 1 }!.offset
             let p = exclusion.edgeFactor(r)
-            return .init { z -> BaseModule in
-                let q = MultivariatePolynomial(z)
-                let r = e * exclusion.exclude(p * q)
-                return r.asLinearCombination
+            if p.isZero {
+                return .zero
+            } else {
+                let e = edgeSign(from: from, to: to)
+                return .init { z -> BaseModule in
+                    let q = MultivariatePolynomial(z)
+                    let r = e * exclusion.exclude(p * q)
+                    return r.asLinearCombination
+                }
             }
         }
     }
@@ -184,7 +188,7 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
             if exclusion {
                 for r in 0 ..< n where current[r] != nil {
                     let f = current[r]!
-                    if let i = f.indeterminateOfPrimaryExclusion {
+                    if let i = f.primaryExclusive(in: vars) {
                         append(r, i, f)
                         vars.remove(i)
                     }
@@ -192,12 +196,13 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
                 
                 for r in 0 ..< n where current[r] != nil {
                     let f = current[r]!
-                    if let i = f.indeterminateOfSecondaryExclusion {
+                    if let i = f.secondaryExclusive(in: vars) {
+//                        print("exclude x\(Format.sub(i)) by \(f)")
                         append(r, i, f)
-                        
-                        // TODO must remove other involved vars.
-                        vars.remove(i)
-                        break
+                        vars.subtract(f.involvedIndeterminates)
+                        if vars.isEmpty {
+                            break
+                        }
                     }
                 }
             }

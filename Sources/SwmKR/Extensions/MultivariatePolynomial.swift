@@ -14,22 +14,38 @@ extension MultiIndex {
 }
 
 extension MultivariatePolynomialType {
-    var indeterminateOfPrimaryExclusion: Int? {
+    func primaryExclusive(in vars: Set<Int>) -> Int? {
         if !elements.allSatisfy({ (e, _) in
             e.total <= 1
         }) {
             return nil
         }
-        return elements.first{ (e, a) in !a.isZero }?.key.firstNonZeroIndex
+        return elements.first{ (e, a) in
+            !a.isZero // && e.indices.contains(1)
+        }?.key.firstNonZeroIndex
     }
     
-    var indeterminateOfSecondaryExclusion: Int? {
-        if !elements.allSatisfy({ (e, _) in
-            e.total <= 2
+    func secondaryExclusive(in vars: Set<Int>) -> Int? {
+        if !elements.allSatisfy({ (e, a) in
+            a.isZero || e.total <= 2 && e.indices.enumerated().allSatisfy{ (i, ei) in
+                ei == 0 || vars.contains(i)
+            }
         }) {
             return nil
         }
-        return elements.first{ (e, a) in !a.isZero && e.indices.contains(2) }?.key.firstNonZeroIndex
+        return elements.first{ (e, a) in
+            !a.isZero && e.indices.contains(2)
+        }?.key.firstNonZeroIndex
+    }
+    
+    var involvedIndeterminates: Set<Int> {
+        elements.reduce(into: []) { (res, next) in
+            let (e, a) = next
+            if a.isZero { return }
+            for (i, ei) in e.indices.enumerated() where ei > 0 {
+                res.insert(i)
+            }
+        }
     }
     
     func degree(as i: Int) -> Int {
