@@ -161,8 +161,7 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
             
             for r in 0 ..< n {
                 let f = current[r]!
-                if f.isLinear && f.degree == 2 { // recall: each xi has deg = 2.
-                    let i = f.leadTerm.indexOfIndeterminate
+                if let i = f.indeterminateOfPrimaryExclusion {
 
                     table[i] = .indeterminate(i)
                     table = table.mapValues{ $0.divide(by: f, as: i).remainder }
