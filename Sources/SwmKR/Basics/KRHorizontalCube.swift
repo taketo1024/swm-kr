@@ -70,15 +70,23 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
             return .zeroModule
         }
         
-        let remain = (0 ..< dim).subtract(exclusion.excludedIndeterminates)
+        let primExc = exclusion.primarilyExcludedIndeterminates
+        let secExc = exclusion.secondarilyExcludedIndeterminates
+        let remain = (0 ..< dim).subtract(primExc)
+        
         let mons = KR.EdgeRing<R>.monomials(
             ofDegree: 2 * deg,
             usingIndeterminates: remain
-        ).map {
-            BaseModule.Generator(exponent: $0.leadExponent)
+        ).exclude { m in
+            let e = m.leadExponent
+            return secExc.contains { i in
+                e[i] >= 2
+            }
         }
         
-        return ModuleStructure<BaseModule>(rawGenerators: mons)
+        return ModuleStructure<BaseModule>(rawGenerators: mons.map {
+            BaseModule.Generator(exponent: $0.leadExponent)
+        })
     }
     
     private func edgeFactor(_ r: Int) -> KR.EdgeRing<R> {
@@ -103,7 +111,8 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
             let p = exclusion.edgeFactor(r)
             return .init { z -> BaseModule in
                 let q = MultivariatePolynomial(z)
-                return e * (p * q).asLinearCombination
+                let r = e * exclusion.exclude(p * q)
+                return r.asLinearCombination
             }
         }
     }
@@ -151,11 +160,17 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
                 cube.edgeFactor(r)
             }
             
+            var vars = Set(0 ..< n)
+            
             factors.append(current)
             
             func append(_ r: Int, _ i: Int, _ f: KR.EdgeRing<R>) {
                 current[r] = nil
-                current = current.mapValues { $0.divide(by: f, as: i).remainder }
+                current = current.mapValues {
+                    $0.divide(by: f, as: i).remainder
+                }.exclude{
+                    $0.value.isZero
+                }
                 
                 path.append((
                     direction: r,
@@ -167,17 +182,22 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
             }
             
             if exclusion {
-                for r in 0 ..< n {
+                for r in 0 ..< n where current[r] != nil {
                     let f = current[r]!
                     if let i = f.indeterminateOfPrimaryExclusion {
                         append(r, i, f)
+                        vars.remove(i)
                     }
                 }
                 
-                for r in 0 ..< n where current[r] != nil && !current[r]!.isZero {
+                for r in 0 ..< n where current[r] != nil {
                     let f = current[r]!
                     if let i = f.indeterminateOfSecondaryExclusion {
-                        // TODO
+                        append(r, i, f)
+                        
+                        // TODO must remove other involved vars.
+                        vars.remove(i)
+                        break
                     }
                 }
             }
@@ -193,8 +213,16 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
             Set(path.map{ $0.direction })
         }
         
-        var excludedIndeterminates: Set<Int> {
-            Set(path.map{ $0.excluded })
+        var primarilyExcludedIndeterminates: Set<Int> {
+            Set(path.compactMap{ (_, i, f) in
+                f.degree(as: i) == 1 ? i : nil
+            })
+        }
+        
+        var secondarilyExcludedIndeterminates: Set<Int> {
+            Set(path.compactMap{ (_, i, f) in
+                f.degree(as: i) == 2 ? i : nil
+            })
         }
         
         func exclude(_ g: KR.EdgeRing<R>) -> KR.EdgeRing<R> {

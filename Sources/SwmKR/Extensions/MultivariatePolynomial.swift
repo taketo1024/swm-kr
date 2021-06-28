@@ -32,6 +32,10 @@ extension MultivariatePolynomialType {
         return elements.first{ (e, a) in !a.isZero && e.indices.contains(2) }?.key.firstNonZeroIndex
     }
     
+    func degree(as i: Int) -> Int {
+        elements.map{ $0.key[i] }.max() ?? 0
+    }
+    
     func substitute(_ table: [Int : Self]) -> Self {
         if table.isEmpty {
             return self
