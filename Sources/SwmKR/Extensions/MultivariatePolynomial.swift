@@ -7,15 +7,49 @@
 
 import SwmCore
 
+extension MultiIndex {
+    var firstNonZeroIndex: Int? {
+        indices.enumerated().first{ (i, e) in e > 0 }?.offset
+    }
+}
+
 extension MultivariatePolynomialType {
-    var isLinear: Bool {
-        elements.allSatisfy { (e, _) in
+    func primaryExclusive(in vars: Set<Int>) -> Int? {
+        if !elements.allSatisfy({ (e, _) in
             e.total <= 1
+        }) {
+            return nil
+        }
+        return elements.first{ (e, a) in
+            !a.isZero // && e.indices.contains(1)
+        }?.key.firstNonZeroIndex
+    }
+    
+    func secondaryExclusive(in vars: Set<Int>) -> Int? {
+        if !elements.allSatisfy({ (e, a) in
+            a.isZero || e.total <= 2 && e.indices.enumerated().allSatisfy{ (i, ei) in
+                ei == 0 || vars.contains(i)
+            }
+        }) {
+            return nil
+        }
+        return elements.first{ (e, a) in
+            !a.isZero && e.indices.contains(2)
+        }?.key.firstNonZeroIndex
+    }
+    
+    var involvedIndeterminates: Set<Int> {
+        elements.reduce(into: []) { (res, next) in
+            let (e, a) = next
+            if a.isZero { return }
+            for (i, ei) in e.indices.enumerated() where ei > 0 {
+                res.insert(i)
+            }
         }
     }
     
-    var indexOfIndeterminate: Int {
-        leadExponent.indices.enumerated().first{ (i, e) in e > 0 }!.offset
+    func degree(as i: Int) -> Int {
+        elements.map{ $0.key[i] }.max() ?? 0
     }
     
     func substitute(_ table: [Int : Self]) -> Self {

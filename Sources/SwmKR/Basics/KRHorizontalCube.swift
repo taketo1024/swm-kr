@@ -34,11 +34,8 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
         self.vCoords = vCoords
         self.slice = slice
         self.connection = connection
-        self.exclusion = .empty
-        
-        if exclusion {
-            self.exclusion = Exclusion(self)
-        }
+        self.exclusion = .empty // must initialize first
+        self.exclusion = Exclusion(self, exclusion: exclusion)
     }
     
     var dim: Int {
@@ -73,15 +70,23 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
             return .zeroModule
         }
         
-        let remain = (0 ..< dim).subtract(exclusion.excludedIndeterminates)
+        let primExc = exclusion.primarilyExcludedIndeterminates
+        let secExc = exclusion.secondarilyExcludedIndeterminates
+        let remain = (0 ..< dim).subtract(primExc)
+        
         let mons = KR.EdgeRing<R>.monomials(
             ofDegree: 2 * deg,
             usingIndeterminates: remain
-        ).map {
-            BaseModule.Generator(exponent: $0.leadExponent)
+        ).exclude { m in
+            let e = m.leadExponent
+            return secExc.contains { i in
+                e[i] >= 2
+            }
         }
         
-        return ModuleStructure<BaseModule>(rawGenerators: mons)
+        return ModuleStructure<BaseModule>(rawGenerators: mons.map {
+            BaseModule.Generator(exponent: $0.leadExponent)
+        })
     }
     
     private func edgeFactor(_ r: Int) -> KR.EdgeRing<R> {
@@ -101,12 +106,17 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
     func edge(from: Coords, to: Coords) -> ModuleEnd<BaseModule> {
         assert((to - from).weight == 1)
         return edgeCache.getOrSet(key: from.concat(with: to)) {
-            let e = edgeSign(from: from, to: to)
             let r = (to - from).enumerated().first { (_, b) in b == 1 }!.offset
-            let p = exclusion.exclude(edgeFactor(r))
-            return .init { z -> BaseModule in
-                let q = MultivariatePolynomial(z)
-                return e * (p * q).asLinearCombination
+            let p = exclusion.edgeFactor(r)
+            if p.isZero {
+                return .zero
+            } else {
+                let e = edgeSign(from: from, to: to)
+                return .init { z -> BaseModule in
+                    let q = MultivariatePolynomial(z)
+                    let r = e * exclusion.exclude(p * q)
+                    return r.asLinearCombination
+                }
             }
         }
     }
@@ -136,20 +146,17 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
         )
         
         private var path: [Step]
-        private var table: [Int: KR.EdgeRing<R>]
         private var factors: [[Int: KR.EdgeRing<R>]]
         
-        private init(_ path: [Step], _ table: [Int: KR.EdgeRing<R>], _ factors: [[Int: KR.EdgeRing<R>]]) {
+        private init(_ path: [Step], _ factors: [[Int: KR.EdgeRing<R>]]) {
             self.path = path
-            self.table = table
             self.factors = factors
         }
         
-        init(_ cube: Cube) {
+        init(_ cube: Cube, exclusion: Bool = false) {
             typealias P = KR.EdgeRing<R>
             
             var path: [Step] = []
-            var table: [Int: KR.EdgeRing<R>] = .empty
             var factors: [[Int: KR.EdgeRing<R>]] = []
             
             let n = cube.dim
@@ -157,46 +164,81 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
                 cube.edgeFactor(r)
             }
             
+            var vars = Set(0 ..< n)
+            
             factors.append(current)
             
-            for r in 0 ..< n {
-                let f = current[r]!
-                if f.isLinear && f.degree == 2 { // recall: each xi has deg = 2.
-                    let i = f.leadTerm.indexOfIndeterminate
-
-                    table[i] = .indeterminate(i)
-                    table = table.mapValues{ $0.divide(by: f, as: i).remainder }
-                    
-                    current[r] = nil
-                    current = current.mapValues { $0.divide(by: f, as: i).remainder }
-                    
-                    path.append((
-                        direction: r,
-                        excluded: i,
-                        divisor: f
-                    ))
-                    
-                    factors.append(current)
+            func append(_ r: Int, _ i: Int, _ f: KR.EdgeRing<R>) {
+                current[r] = nil
+                current = current.mapValues {
+                    $0.divide(by: f, as: i).remainder
+                }.exclude{
+                    $0.value.isZero
+                }
+                
+                path.append((
+                    direction: r,
+                    excluded: i,
+                    divisor: f
+                ))
+                
+                factors.append(current)
+            }
+            
+            if exclusion {
+                for r in 0 ..< n where current[r] != nil {
+                    let f = current[r]!
+                    if let i = f.primaryExclusive(in: vars) {
+                        append(r, i, f)
+                        vars.remove(i)
+                    }
+                }
+                
+                for r in 0 ..< n where current[r] != nil {
+                    let f = current[r]!
+                    if let i = f.secondaryExclusive(in: vars) {
+//                        print("exclude x\(Format.sub(i)) by \(f)")
+                        append(r, i, f)
+                        vars.subtract(f.involvedIndeterminates)
+                        if vars.isEmpty {
+                            break
+                        }
+                    }
                 }
             }
             
-            self.init(path, table, factors)
+            self.init(path, factors)
         }
         
         static var empty: Self {
-            .init([], [:], [])
+            .init([], [])
         }
         
         var excludedDirections: Set<Int> {
             Set(path.map{ $0.direction })
         }
         
-        var excludedIndeterminates: Set<Int> {
-            Set(path.map{ $0.excluded })
+        var primarilyExcludedIndeterminates: Set<Int> {
+            Set(path.compactMap{ (_, i, f) in
+                f.degree(as: i) == 1 ? i : nil
+            })
         }
         
-        func exclude(_ f: KR.EdgeRing<R>) -> KR.EdgeRing<R> {
-            table.isEmpty ? f : f.substitute(table)
+        var secondarilyExcludedIndeterminates: Set<Int> {
+            Set(path.compactMap{ (_, i, f) in
+                f.degree(as: i) == 2 ? i : nil
+            })
+        }
+        
+        func exclude(_ g: KR.EdgeRing<R>) -> KR.EdgeRing<R> {
+            path.reduce(g) { (g, next) in
+                let (_, i, f) = next
+                return g.divide(by: f, as: i).remainder
+            }
+        }
+        
+        func edgeFactor(_ r: Int) -> KR.EdgeRing<R> {
+            factors.last?[r] ?? .zero
         }
         
         // z ↦ φ(z)
