@@ -21,6 +21,7 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
     public let L: Link
     public let normalized: Bool
     public let exclusion: Bool
+    public let symmetry: Bool
     
     private let gradingShift: KR.Grading
     private var connection: [Int : KR.EdgeConnection<R>]
@@ -28,19 +29,23 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
     private let horizontalHomologyCache: Cache<hKey, HorizontalHomology> = .empty
     private let verticalHomologyCache: Cache<vKey, VerticalHomology> = .empty
 
-    public init(_ L: Link, normalized: Bool = true, exclusion: Bool = true) {
+    public init(_ L: Link, normalized: Bool = true, exclusion: Bool = true, symmetry: Bool = true) {
         let w = L.writhe
         let b = L.resolved(by: L.orientationPreservingState).components.count
         
         self.L = L
         self.normalized = normalized
         self.exclusion = exclusion
+        self.symmetry = symmetry
         self.gradingShift = normalized ? [-w + b - 1, w + b - 1, w - b + 1] : .zero
         self.connection = KREdgeConnection(L).compute()
     }
     
     public subscript(idx: Index) -> Object {
         let (i, j, k) = idx.triple
+        if symmetry & i > 0 {
+            return self[-i, j, k + 2 * i]
+        }
         guard let (h, v, s) = ijk2hvs(i, j, k) else {
             return .zeroModule
         }
