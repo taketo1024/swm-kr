@@ -43,7 +43,7 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
     
     public subscript(idx: Index) -> Object {
         let (i, j, k) = idx.triple
-        if symmetry & i > 0 {
+        if symmetry && i > 0 {
             return self[-i, j, k + 2 * i]
         }
         guard let (h, v, s) = ijk2hvs(i, j, k) else {
