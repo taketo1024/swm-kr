@@ -43,7 +43,6 @@ let package = Package(
                 .product(name: "SwmKhovanov", package: "swm-khovanov"),
             ]
         ),
-        .target(name: "Sample", dependencies: ["SwmKR"]),
         .testTarget(
             name: "SwmKRTests",
             dependencies: ["SwmKR"]
