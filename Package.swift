@@ -23,9 +23,9 @@ let package = Package(
 //            path: "../swm-knots/"
 		),
         .package(
-//            url: "https://github.com/taketo1024/swm-homology.git",
-//            from: "1.3.1"
-            path: "../swm-homology/"
+            url: "https://github.com/taketo1024/swm-homology.git",
+            from: "1.3.1"
+//            path: "../swm-homology/"
 		),
         .package(
             url: "https://github.com/taketo1024/swm-khovanov.git",
