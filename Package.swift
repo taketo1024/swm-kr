@@ -19,13 +19,13 @@ let package = Package(
 		),
         .package(
 			url: "https://github.com/taketo1024/swm-knots.git",
-			from: "1.1.0"
+			from: "1.2.0"
 //            path: "../swm-knots/"
 		),
         .package(
-            url: "https://github.com/taketo1024/swm-homology.git",
-            from: "1.3.1"
-//            path: "../swm-homology/"
+//            url: "https://github.com/taketo1024/swm-homology.git",
+//            from: "1.3.1"
+            path: "../swm-homology/"
 		),
         .package(
             url: "https://github.com/taketo1024/swm-khovanov.git",
@@ -43,7 +43,7 @@ let package = Package(
                 .product(name: "SwmKhovanov", package: "swm-khovanov"),
             ]
         ),
-//        .target(name: "Sample", dependencies: ["SwmKR"]),
+        .target(name: "Sample", dependencies: ["SwmKR"]),
         .testTarget(
             name: "SwmKRTests",
             dependencies: ["SwmKR"]
