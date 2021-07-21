@@ -50,7 +50,7 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
             if j < lowestA || highestA < j {
                 return .zeroModule
             }
-            if i < 0 {
+            if i > 0 {
                 return self[-i, j, k + 2 * i]
             }
         }
