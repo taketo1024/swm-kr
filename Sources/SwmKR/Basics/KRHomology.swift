@@ -43,8 +43,16 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
     
     public subscript(idx: Index) -> Object {
         let (i, j, k) = idx.triple
-        if symmetry && i > 0 {
-            return self[-i, j, k + 2 * i]
+        if normalized && symmetry {
+            if i < lowestQ || highestQ < i {
+                return .zeroModule
+            }
+            if j < lowestA || highestA < j {
+                return .zeroModule
+            }
+            if i < 0 {
+                return self[-i, j, k + 2 * i]
+            }
         }
         guard let (h, v, s) = ijk2hvs(i, j, k) else {
             return .zeroModule
@@ -53,8 +61,24 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
         return H[v]
     }
     
-    public var minSlice: Int {
+    private var minSlice: Int {
         -2 * L.crossingNumber
+    }
+    
+    private var highestQ: Int {
+        L.crossingNumber - L.numberOfSeifertCircles + 1
+    }
+    
+    private var lowestQ: Int {
+        -L.crossingNumber + L.numberOfSeifertCircles - 1
+    }
+    
+    private var highestA: Int {
+        L.writhe + L.numberOfSeifertCircles - 1
+    }
+    
+    private var lowestA: Int {
+        L.writhe - L.numberOfSeifertCircles + 1
     }
     
     public var support: [MultiIndex<_3>] {
@@ -182,26 +206,22 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
     }
     
     public var highestQPart: KR.qaPolynomial<𝐙> {
-        let i0 = L.crossingNumber - L.numberOfSeifertCircles + 1
-        let str = structure { (i, _, _) in i == i0 }
+        let str = structure { (i, _, _) in i == highestQ }
         return qaPolynomial(str)
     }
     
     public var lowestQPart: KR.qaPolynomial<𝐙> {
-        let i0 = -L.crossingNumber + L.numberOfSeifertCircles - 1
-        let str = structure { (i, _, _) in i == i0 }
+        let str = structure { (i, _, _) in i == lowestQ }
         return qaPolynomial(str)
     }
     
     public var highestAPart: KR.qaPolynomial<𝐙> {
-        let j0 = -L.writhe + L.numberOfSeifertCircles - 1
-        let str = structure { (_, j, _) in j == j0 }
+        let str = structure { (_, j, _) in j == highestA }
         return qaPolynomial(str)
     }
     
     public var lowestAPart: KR.qaPolynomial<𝐙> {
-        let j0 = L.writhe - L.numberOfSeifertCircles + 1
-        let str = structure { (_, j, _) in j == j0 }
+        let str = structure { (_, j, _) in j == lowestA }
         return qaPolynomial(str)
     }
     
