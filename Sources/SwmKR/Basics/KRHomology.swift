@@ -44,7 +44,7 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
     public subscript(idx: Index) -> Object {
         let (i, j, k) = idx.triple
         if normalized && symmetry {
-            if i < lowestQ || highestQ < i {
+            if i < lowestQ {
                 return .zeroModule
             }
             if j < lowestA || highestA < j {

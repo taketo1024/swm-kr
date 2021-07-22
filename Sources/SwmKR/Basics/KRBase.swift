@@ -18,15 +18,18 @@ public struct KR {
         }
         public typealias xn = EnumeratedPolynomialIndeterminates<x, anySize>
         
+        public struct t: PolynomialIndeterminate {
+            public static let symbol = "t"
+        }
         public struct q: PolynomialIndeterminate {
             public static let symbol = "q"
         }
-        
         public struct a: PolynomialIndeterminate {
             public static let symbol = "a"
         }
         
         public typealias qa = BivariatePolynomialIndeterminates<q, a>
+        public typealias qat = TrivariatePolynomialIndeterminates<q, a, t>
     }
 
     public typealias Grading = MultiIndex<_3>
@@ -37,6 +40,9 @@ public struct KR {
     
     public typealias qPolynomial<R: Ring>  = LaurentPolynomial<R, Indeterminates.q>
     public typealias qaPolynomial<R: Ring> = MultivariateLaurentPolynomial<R, Indeterminates.qa>
+    public typealias qatPolynomial<R: Ring> = MultivariateLaurentPolynomial<R, Indeterminates.qat>
+    
+    public typealias Structure<R: Ring> = [KR.Grading : ModuleStructure<KR.TotalModule<R>>]
 
     static func baseGrading(link L: Link, hCoords: Cube.Coords, vCoords: Cube.Coords) -> KR.Grading {
         (0 ..< L.crossingNumber).sum { i -> KR.Grading in
@@ -73,5 +79,12 @@ public struct KR {
             "\((ik: ik, il: il))"
         }
     }
+    
+    public static func asQatPolynomial<R: Ring>(_ structure: Structure<R>) -> qatPolynomial<Int> {
+        .init(elements: structure.map { (g, V) in
+            let (i, j, k) = (g[0], g[1], g[2])
+            let h = (k - j) / 2
+            return ([i, j, h], V.rank)
+        })
+    }
 }
-
