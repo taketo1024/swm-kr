@@ -14,7 +14,7 @@ let package = Package(
     dependencies: [
         .package(
 			url: "https://github.com/taketo1024/swm-core.git",
-			from:"1.2.6"
+			from:"1.2.8"
 //            path: "../swm-core/"
 		),
         .package(
@@ -24,7 +24,7 @@ let package = Package(
 		),
         .package(
             url: "https://github.com/taketo1024/swm-homology.git",
-            from: "1.3.1"
+            from: "1.3.3"
 //            path: "../swm-homology/"
 		),
         .package(
@@ -32,6 +32,10 @@ let package = Package(
             from: "1.1.6"
 //            path: "../swm-khovanov/"
         ),
+        .package(
+            url: "https://github.com/swiftcsv/SwiftCSV.git",
+            from: "0.6.0"
+        )
     ],
     targets: [
         .target(
@@ -43,6 +47,7 @@ let package = Package(
                 .product(name: "SwmKhovanov", package: "swm-khovanov"),
             ]
         ),
+        .target(name: "Sample", dependencies: ["SwmKR", "SwiftCSV"]),
         .testTarget(
             name: "SwmKRTests",
             dependencies: ["SwmKR"]
