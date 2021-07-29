@@ -35,6 +35,10 @@ let package = Package(
         .package(
             url: "https://github.com/swiftcsv/SwiftCSV.git",
             from: "0.6.0"
+        ),
+        .package(
+            url: "https://github.com/crossroadlabs/Regex.git",
+            from: "1.2.0"
         )
     ],
     targets: [
@@ -47,7 +51,7 @@ let package = Package(
                 .product(name: "SwmKhovanov", package: "swm-khovanov"),
             ]
         ),
-        .target(name: "Sample", dependencies: ["SwmKR", "SwiftCSV"]),
+        .target(name: "Sample", dependencies: ["SwmKR", "SwiftCSV", "Regex"]),
         .testTarget(
             name: "SwmKRTests",
             dependencies: ["SwmKR"]
