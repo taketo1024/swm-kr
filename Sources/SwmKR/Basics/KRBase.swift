@@ -29,7 +29,7 @@ public struct KR {
         }
         
         public typealias qa = BivariatePolynomialIndeterminates<q, a>
-        public typealias qat = TrivariatePolynomialIndeterminates<q, a, t>
+        public typealias tqa = TrivariatePolynomialIndeterminates<t, q, a>
     }
 
     public typealias Grading = MultiIndex<_3>
@@ -40,7 +40,7 @@ public struct KR {
     
     public typealias qPolynomial<R: Ring>  = LaurentPolynomial<R, Indeterminates.q>
     public typealias qaPolynomial<R: Ring> = MultivariateLaurentPolynomial<R, Indeterminates.qa>
-    public typealias qatPolynomial<R: Ring> = MultivariateLaurentPolynomial<R, Indeterminates.qat>
+    public typealias tqaPolynomial<R: Ring> = MultivariateLaurentPolynomial<R, Indeterminates.tqa>
     
     public typealias Structure<R: Ring> = [KR.Grading : ModuleStructure<KR.TotalModule<R>>]
 
@@ -78,13 +78,5 @@ public struct KR {
         var description: String {
             "\((ik: ik, il: il))"
         }
-    }
-    
-    public static func asQatPolynomial<R: Ring>(_ structure: Structure<R>) -> qatPolynomial<Int> {
-        .init(elements: structure.map { (g, V) in
-            let (i, j, k) = (g[0], g[1], g[2])
-            let h = (k - j) / 2
-            return ([i, j, h], V.rank)
-        })
     }
 }

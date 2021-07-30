@@ -44,10 +44,10 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
     public subscript(idx: Index) -> Object {
         let (i, j, k) = idx.triple
         if normalized && symmetry {
-            if i < lowestQ {
+            if i < lowestQDegree {
                 return .zeroModule
             }
-            if j < lowestA || highestA < j {
+            if j < lowestADegree || highestADegree < j {
                 return .zeroModule
             }
             if i > 0 {
@@ -65,20 +65,20 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
         -2 * L.crossingNumber
     }
     
-    private var highestQ: Int {
-        L.crossingNumber - L.numberOfSeifertCircles + 1
-    }
-    
-    private var lowestQ: Int {
+    public var lowestQDegree: Int {
         -L.crossingNumber + L.numberOfSeifertCircles - 1
     }
     
-    private var highestA: Int {
-        L.writhe + L.numberOfSeifertCircles - 1
+    public var highestQDegree: Int {
+        L.crossingNumber - L.numberOfSeifertCircles + 1
     }
     
-    private var lowestA: Int {
+    public var lowestADegree: Int {
         L.writhe - L.numberOfSeifertCircles + 1
+    }
+    
+    public var highestADegree: Int {
+        L.writhe + L.numberOfSeifertCircles - 1
     }
     
     public var support: [MultiIndex<_3>] {
@@ -206,22 +206,22 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
     }
     
     public var highestQPart: KR.qaPolynomial<𝐙> {
-        let str = structure { (i, _, _) in i == highestQ }
+        let str = structure { (i, _, _) in i == highestQDegree }
         return qaPolynomial(str)
     }
     
     public var lowestQPart: KR.qaPolynomial<𝐙> {
-        let str = structure { (i, _, _) in i == lowestQ }
+        let str = structure { (i, _, _) in i == lowestQDegree }
         return qaPolynomial(str)
     }
     
     public var highestAPart: KR.qaPolynomial<𝐙> {
-        let str = structure { (_, j, _) in j == highestA }
+        let str = structure { (_, j, _) in j == highestADegree }
         return qaPolynomial(str)
     }
     
     public var lowestAPart: KR.qaPolynomial<𝐙> {
-        let str = structure { (_, j, _) in j == lowestA }
+        let str = structure { (_, j, _) in j == lowestADegree }
         return qaPolynomial(str)
     }
     
