@@ -20,17 +20,23 @@ final class App {
     let storage: Storage
     let maxCrossings: Int
     
-    init(storageDir: String, maxCrossings: Int = 11) {
+    init(storageDir: String, maxCrossings: Int = 12) {
         self.storage = Storage(dir: dir)
         self.maxCrossings = maxCrossings
     }
     
-    func load(_ name: String) -> Structure? {
+    func exists(_ name: String) -> Bool {
         let file = "\(name).json"
-        if !storage.exists(name: file) {
+        return storage.exists(name: file)
+    }
+    
+    func load(_ name: String) -> Structure? {
+        if exists(name) {
+            let file = "\(name).json"
+            return try? storage.loadJSON(name: file)
+        } else {
             return nil
         }
-        return try? storage.loadJSON(name: file)
     }
 
     func save(_ name: String, _ str: Structure) {
@@ -47,8 +53,7 @@ final class App {
             let target = row["name"]!
             let braidCode = try! JSONDecoder().decode([Int].self, from: row["braid"]!.data(using: .utf8)!)
 
-            let file = "\(target).json"
-            if skipExisting && self.storage.exists(name: file) {
+            if self.exists(target) && skipExisting {
                 return
             }
 
@@ -56,7 +61,7 @@ final class App {
         }
     }
 
-    func compute(_ target: String, _ braidCode: [Int]) {
+    func compute(_ target: String, _ braidCode: [Int], overwrite: Bool = false) {
         let strands = braidCode.map{ $0.abs }.max()! + 1
         let braid = Braid<anySize>(strands: strands, code: braidCode)
         let K = braid.closure
@@ -73,7 +78,9 @@ final class App {
             ([g[0], g[1], g[2]], V.rank)
         }
         
-        self.save(target, raw)
+        if !exists(target) || overwrite {
+            self.save(target, raw)
+        }
         
         print(table(raw), "\n")
     }
@@ -131,6 +138,7 @@ final class App {
             let answer = row["HOMFLY"]!
             
             guard let str = self.load(target) else {
+                print(target, " : skip")
                 return
             }
             
