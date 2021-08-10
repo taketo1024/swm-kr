@@ -39,7 +39,8 @@ let package = Package(
         .package(
             url: "https://github.com/crossroadlabs/Regex.git",
             from: "1.2.0"
-        )
+        ),
+        .package(url: "https://github.com/johnno1962/Fortify", from: "2.1.4")
     ],
     targets: [
         .target(
@@ -51,7 +52,7 @@ let package = Package(
                 .product(name: "SwmKhovanov", package: "swm-khovanov"),
             ]
         ),
-        .target(name: "Sample", dependencies: ["SwmKR", "SwiftCSV", "Regex"]),
+        .target(name: "Sample", dependencies: ["SwmKR", "SwiftCSV", "Regex", "Fortify"]),
         .testTarget(
             name: "SwmKRTests",
             dependencies: ["SwmKR"]

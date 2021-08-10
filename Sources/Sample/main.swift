@@ -9,8 +9,15 @@ import Foundation
 import SwmCore
 import SwmKnots
 import SwmKR
+import Fortify
 
-let dir = "/Users/taketo1024/Projects/swm-kr/data/"
-let app = App(storageDir: dir)
+let dir = "/Users/taketo/Projects/swm/swm-kr/data/"
+let app = App(storageDir: dir, maxCrossings: 12)
 
-app.printResults("braid-11", format: .table)
+do {
+    try Fortify.protect {
+        app.computeAll("braid-11")
+    }
+} catch {
+    print("error: \(error)")
+}
