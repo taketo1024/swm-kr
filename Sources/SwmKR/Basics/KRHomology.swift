@@ -61,6 +61,11 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
         return H[v]
     }
     
+    public func clearCache() {
+        horizontalHomologyCache.clear()
+        verticalHomologyCache.clear()
+    }
+    
     private var minSlice: Int {
         -2 * L.crossingNumber
     }
@@ -138,7 +143,7 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
         let key = vKey(hDegree: h, slice: s)
         return verticalHomologyCache.getOrSet(key: key) {
             let C = verticalComplex(hDegree: h, slice: s)
-            return C.homology()
+            return C.homology(options: .onlyStructures)
         }
     }
     
@@ -232,7 +237,7 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
         })
     }
     
-    private func ijk2hvs(_ i: Int, _ j: Int, _ k: Int) -> (Int, Int, Int)? {
+    public func ijk2hvs(_ i: Int, _ j: Int, _ k: Int) -> (Int, Int, Int)? {
         let g = baseGrading
         let (a, b, c) = (g[0], g[1], g[2])
 
@@ -243,7 +248,7 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
         }
     }
     
-    private func hvs2ijk(_ h: Int, _ v: Int, _ s: Int) -> (Int, Int, Int) {
+    public func hvs2ijk(_ h: Int, _ v: Int, _ s: Int) -> (Int, Int, Int) {
         let g = baseGrading
         let (a, b, c) = (g[0], g[1], g[2])
         return (a + 2 * h + 2 * s,

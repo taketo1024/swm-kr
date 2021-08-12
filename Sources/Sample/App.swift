@@ -84,11 +84,41 @@ final class App {
     }
     
     private func _compute<R: HomologyCalculatable>(_ K: Link, _ type: R.Type) -> Structure {
+        var result: Structure = [:]
+        
         let H = KRHomology<R>(K)
-        let str = H.structure()
-        return str.mapPairs { (g, V) in
-            ([g[0], g[1], g[2]], V.rank)
+        
+        let n = K.crossingNumber
+        let r = K.numberOfSeifertCircles
+        
+        let s0 = -2 * n
+        let s1 = (-3 * n + r - 1) / 2
+        
+//        log("level range: [\(s0), \(s1)]\n")
+        
+        for s in s0 ... s1 {
+            for v in 0 ... n {
+                for h in 0 ... n {
+                    let (i, j, k) = H.hvs2ijk(h, v, s)
+//                    log("(l, h, v) = \((s, h, v))\n(i, j, k) = \((i, j, k))", level: 2)
+                    if i > 0 || j < H.lowestQDegree || H.highestADegree < j {
+//                        log("skip.\n", level: 2)
+                        continue
+                    }
+                    
+                    let d = H[i, j, k].rank
+                    
+//                    log("H\([i, j, k]) = \(d)\n", level: 2)
+                    if d > 0 {
+                        result[[i, j, k]] = d
+                        result[[-i, j, k + 2 * i]] = d
+                    }
+                }
+            }
+            H.clearCache()
         }
+
+        return result
     }
     
     
