@@ -10,19 +10,19 @@ import SwmCore
 import SwmHomology
 import SwmKnots
 import SwmKR
+import SwmxBigInt
 import SwiftCSV
 import Regex
 
 final class App {
-    typealias R = RationalNumber
     typealias Structure = [[Int] : Int]
     
     let storage: Storage
-    let maxCrossings: Int
+    var maxCrossings = 12
+    var useBigRational = false
     
-    init(storageDir: String, maxCrossings: Int = 12) {
+    init(storageDir: String) {
         self.storage = Storage(dir: dir)
-        self.maxCrossings = maxCrossings
     }
     
     func exists(_ name: String) -> Bool {
@@ -72,18 +72,25 @@ final class App {
         
         print("target: \(target), n = \(K.crossingNumber)")
         
-        let H = KRHomology<R>(K)
-        let str = H.structure()
-        let raw = str.mapPairs { (g, V) in
-            ([g[0], g[1], g[2]], V.rank)
-        }
+        let str = useBigRational
+            ? _compute(K, BigRational.self)
+            : _compute(K, RationalNumber.self)
         
         if !exists(target) || overwrite {
-            self.save(target, raw)
+            self.save(target, str)
         }
         
-        print(table(raw), "\n")
+        print(table(str), "\n")
     }
+    
+    private func _compute<R: HomologyCalculatable>(_ K: Link, _ type: R.Type) -> Structure {
+        let H = KRHomology<R>(K)
+        let str = H.structure()
+        return str.mapPairs { (g, V) in
+            ([g[0], g[1], g[2]], V.rank)
+        }
+    }
+    
     
     enum ResultFormat {
         case polynomial, table, texPolynomial, texTable

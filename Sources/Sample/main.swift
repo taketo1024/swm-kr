@@ -12,7 +12,7 @@ import SwmKR
 import Fortify
 
 let dir = "/Users/taketo/Projects/swm/swm-kr/data/"
-let app = App(storageDir: dir, maxCrossings: 12)
+let app = App(storageDir: dir)
 
 do {
     try Fortify.protect {
