@@ -19,9 +19,6 @@ internal struct KRTotalCube<R: Ring>: ModuleCube {
     let connection: [Int : KR.EdgeConnection<R>]
     let vertex: (Coords) -> Vertex
     
-    private let vertexCache: Cache<Coords, Vertex> = .empty
-    private let   edgeCache: Cache<Coords, Edge>   = .empty
-    
     init(link L: Link, connection: [Int : KR.EdgeConnection<R>], vertex: @escaping (Coords) -> Vertex) {
         self.L = L
         self.connection = connection
@@ -33,9 +30,7 @@ internal struct KRTotalCube<R: Ring>: ModuleCube {
     }
     
     subscript(v: Coords) -> ModuleStructure<BaseModule> {
-        vertexCache.getOrSet(key: v) {
-            vertex(v)
-        }
+        vertex(v)
     }
     
     private func edgeFactor(_ p: Int, subcoords: Coords) -> KR.EdgeRing<R> {
@@ -52,19 +47,16 @@ internal struct KRTotalCube<R: Ring>: ModuleCube {
     }
     
     func edge(from: Coords, to: Coords) -> ModuleEnd<BaseModule> {
-        edgeCache.getOrSet(key: from.concat(with: to)) {
-            let e = edgeSign(from: from, to: to)
-            let i = (to - from).enumerated().first { (_, b) in b == 1 }!.offset
-            return .init { x -> BaseModule in
-                x.elements.sum { (subcoords, z) -> BaseModule in
-                    
-                    let p = edgeFactor(i, subcoords: subcoords)
-                    let q = MultivariatePolynomial(z)
-                    return IndexedModule(
-                        index: subcoords,
-                        value: e * (p * q).asLinearCombination
-                    )
-                }
+        let e = edgeSign(from: from, to: to)
+        let i = (to - from).enumerated().first { (_, b) in b == 1 }!.offset
+        return .init { x -> BaseModule in
+            x.elements.sum { (subcoords, z) -> BaseModule in
+                let p = edgeFactor(i, subcoords: subcoords)
+                let q = MultivariatePolynomial(z)
+                return IndexedModule(
+                    index: subcoords,
+                    value: e * (p * q).asLinearCombination
+                )
             }
         }
     }
