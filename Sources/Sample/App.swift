@@ -100,15 +100,15 @@ final class App {
             for v in 0 ... n {
                 for h in 0 ... n {
                     let (i, j, k) = H.hvs2ijk(h, v, s)
-//                    log("(l, h, v) = \((s, h, v))\n(i, j, k) = \((i, j, k))", level: 2)
-                    if i > 0 || j < H.lowestQDegree || H.highestADegree < j {
-//                        log("skip.\n", level: 2)
+//                    print("(l, h, v) = \((s, h, v)), (i, j, k) = \((i, j, k))")
+                    if i > 0 || j < H.lowestADegree || H.highestADegree < j {
+//                        print("\tskip.")
                         continue
                     }
                     
                     let d = H[i, j, k].rank
                     
-//                    log("H\([i, j, k]) = \(d)\n", level: 2)
+//                    print("\tH\([i, j, k]) = \(d)")
                     if d > 0 {
                         result[[i, j, k]] = d
                         result[[-i, j, k + 2 * i]] = d
