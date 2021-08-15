@@ -18,33 +18,15 @@ final class App {
     typealias Structure = [[Int] : Int]
     
     let storage: Storage
-    var maxCrossings = 12
     var useBigRational = false
+    var saveProgress = false
+    var logLevel = 0
     
     init(storageDir: String) {
-        self.storage = Storage(dir: dir)
+        self.storage = Storage(dir: storageDir)
     }
     
-    func exists(_ name: String) -> Bool {
-        let file = "\(name).json"
-        return storage.exists(name: file)
-    }
-    
-    func load(_ name: String) -> Structure? {
-        if exists(name) {
-            let file = "\(name).json"
-            return try? storage.loadJSON(name: file)
-        } else {
-            return nil
-        }
-    }
-
-    func save(_ name: String, _ str: Structure) {
-        let file = "\(name).json"
-        try! storage.saveJSON(name: file, object: str)
-    }
-
-    func computeAll(_ input: String, skipExisting: Bool = true) {
+    func computeAll(_ input: String, maxCrossings: Int = 12, skipExisting: Bool = true) {
         let file = "\(dir)/\(input).csv"
         guard let csv = try? CSV(url: URL(fileURLWithPath: file)) else {
             fatalError("Couldn't load \(file)")
@@ -52,7 +34,11 @@ final class App {
         try! csv.enumerateAsDict() { row in
             let target = row["name"]!
             let braidCode = try! JSONDecoder().decode([Int].self, from: row["braid"]!.data(using: .utf8)!)
-
+            
+            if braidCode.count > maxCrossings {
+                return
+            }
+            
             if self.exists(target) && skipExisting {
                 return
             }
@@ -61,61 +47,86 @@ final class App {
         }
     }
 
-    func compute(_ target: String, _ braidCode: [Int], overwrite: Bool = false) {
+    func compute(_ target: String, _ braidCode: [Int]) {
+        let start = Date()
+        
         let strands = braidCode.map{ $0.abs }.max()! + 1
         let braid = Braid<anySize>(strands: strands, code: braidCode)
         let K = braid.closure
         
-        if K.crossingNumber > self.maxCrossings {
-            return
-        }
-        
-        print("target: \(target), n = \(K.crossingNumber)")
-        
+        log("[\(start)]")
+        log("target: \(target)")
+        log("n = \(braidCode.count)\n", level: 2)
+
         let str = useBigRational
-            ? _compute(K, BigRational.self)
-            : _compute(K, RationalNumber.self)
+            ? _compute(target, K, BigRational.self)
+            : _compute(target, K, RationalNumber.self)
         
-        if !exists(target) || overwrite {
-            self.save(target, str)
-        }
-        
-        print(table(str), "\n")
+        log("\(table(str))\n")
+        log("time: \(time(since: start))")
     }
     
-    private func _compute<R: HomologyCalculatable>(_ K: Link, _ type: R.Type) -> Structure {
+    private func _compute<R: HomologyCalculatable>(_ target: String, _ K: Link, _ type: R.Type) -> Structure {
         var result: Structure = [:]
         
         let H = KRHomology<R>(K)
-        
         let n = K.crossingNumber
         let r = K.numberOfSeifertCircles
         
         let s0 = -2 * n
         let s1 = (-3 * n + r - 1) / 2
         
-//        log("level range: [\(s0), \(s1)]\n")
+        log("level range: [\(s0), \(s1)]", level: 2)
+        log("MFW range: [\(H.lowestADegree), \(H.highestADegree)]", level: 2)
+        
+        if useBigRational {
+            log("useBigRational: \(useBigRational)", level: 2)
+        }
+
+        let tmpFile = "tmp-\(target)"
+        if saveProgress, let tmp = load(tmpFile) {
+            result = tmp
+            log("\ncontinue from:\n\(table(result, showZeros: true))", level: 2)
+        }
+        
+        log("", level: 2)
         
         for s in s0 ... s1 {
+            log("level: \(s)", level: 2)
+            
             for v in 0 ... n {
                 for h in 0 ... n {
                     let (i, j, k) = H.hvs2ijk(h, v, s)
-//                    print("(l, h, v) = \((s, h, v)), (i, j, k) = \((i, j, k))")
-                    if i > 0 || j < H.lowestADegree || H.highestADegree < j {
-//                        print("\tskip.")
+                    if i > 0 || j < H.lowestADegree || H.highestADegree < j || result[[i, j, k]] != nil {
                         continue
                     }
                     
+                    log("\tH\([i, j, k]) =", level: 2)
+                    
                     let d = H[i, j, k].rank
                     
-//                    print("\tH\([i, j, k]) = \(d)")
-                    if d > 0 {
-                        result[[i, j, k]] = d
-                        result[[-i, j, k + 2 * i]] = d
+                    log("\t\t\(d)", level: 2)
+                    
+                    result[[i, j, k]] = d
+                    result[[-i, j, k + 2 * i]] = d
+                    
+                    if saveProgress {
+                        save(tmpFile, result)
                     }
                 }
             }
+            
             H.clearCache()
+            log("", level: 2)
+        }
+        
+        result = result.exclude{ (_, d) in d == 0 }
+        
+        if !exists(target) {
+            self.save(target, result)
+        }
+        if saveProgress {
+            delete(tmpFile)
         }
 
         return result
@@ -253,7 +264,7 @@ final class App {
         return (table, js, ks)
     }
     
-    private func table(_ structure: Structure) -> String {
+    private func table(_ structure: Structure, showZeros: Bool = false) -> String {
         let (table, js, ks) = tableData(structure)
         return Format.table(
             rows: ks.reversed(),
@@ -261,8 +272,11 @@ final class App {
             symbol: "k\\j",
             printHeaders: true
         ) { (k, j) -> String in
-            let q = table[[j, k]] ?? .zero
-            return !q.isZero ? "\(q)" : ""
+            if let q = table[[j, k]] {
+                return (!q.isZero || showZeros) ? "\(q)" : ""
+            } else {
+                return ""
+            }
         }
     }
 
@@ -348,6 +362,46 @@ $k \\setminus j$ & \(js.map{ j in "$\(j)$" }.joined(separator: " & ")) \\\\
             let qpoly = z.pow(zdeg)
 
             return apoly * qpoly
+        }
+    }
+    
+    private func time(since: Date) -> String {
+        let dec = 1000.0
+        let time = Date().timeIntervalSince(since)
+        return (time < 1)
+            ? "\(round(time * dec * 1000) / dec) msec."
+            : "\(round(time * dec) / dec) sec."
+    }
+    
+    private func exists(_ name: String) -> Bool {
+        let file = "\(name).json"
+        return storage.exists(name: file)
+    }
+    
+    private func load(_ name: String) -> Structure? {
+        if exists(name) {
+            let file = "\(name).json"
+            return try? storage.loadJSON(name: file)
+        } else {
+            return nil
+        }
+    }
+
+    private func save(_ name: String, _ str: Structure) {
+        let file = "\(name).json"
+        try! storage.saveJSON(name: file, object: str)
+    }
+    
+    private func delete(_ name: String) {
+        if exists(name) {
+            let file = "\(name).json"
+            try! storage.delete(file)
+        }
+    }
+    
+    private func log(_ msg: @autoclosure () -> String, level: Int = 1) {
+        if logLevel >= level {
+            print(msg())
         }
     }
 }
