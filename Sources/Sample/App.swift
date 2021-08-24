@@ -19,6 +19,8 @@ final class App {
     
     let storage: Storage
     var useBigRational = false
+    var useMirror = true
+    var saveResult = false
     var saveProgress = false
     var logLevel = 0
     
@@ -47,7 +49,8 @@ final class App {
         }
     }
 
-    func compute(_ target: String, _ braidCode: [Int]) {
+    @discardableResult
+    func compute(_ target: String, _ braidCode: [Int]) -> Structure {
         let start = Date()
         
         let strands = braidCode.map{ $0.abs }.max()! + 1
@@ -56,56 +59,76 @@ final class App {
         
         log("[\(start)]")
         log("target: \(target)")
-        log("n = \(braidCode.count)\n", level: 2)
 
-        let str = useBigRational
+        let result = useBigRational
             ? _compute(target, K, BigRational.self)
             : _compute(target, K, RationalNumber.self)
         
-        log("\(table(str))\n")
-        log("time: \(time(since: start))")
+        log("\(table(result))\n")
+        log("time: \(time(since: start))\n")
+        
+        if saveResult {
+            self.save(target, result)
+        }
+        
+        return result
     }
     
     private func _compute<R: HomologyCalculatable>(_ target: String, _ K: Link, _ type: R.Type) -> Structure {
+        if useMirror && K.writhe > 0 {
+            log("compute from mirror.", level: 2)
+            return _compute("m\(target)", K.mirrored, type).mirror
+        }
+        
         var result: Structure = [:]
         
         let H = KRHomology<R>(K)
         let n = K.crossingNumber
+        let w = K.writhe
         let r = K.numberOfSeifertCircles
         
-        let s0 = -2 * n
-        let s1 = (-3 * n + r - 1) / 2
+        log("\nn = \(n)", level: 2)
+        log("w = \(w)", level: 2)
+        log("r = \(r)\n", level: 2)
         
-        log("level range: [\(s0), \(s1)]", level: 2)
-        log("MFW range: [\(H.lowestADegree), \(H.highestADegree)]", level: 2)
+        log("level: \(H.levelRange)\n", level: 2)
         
-        if useBigRational {
-            log("useBigRational: \(useBigRational)", level: 2)
-        }
+        log("i: \(H.iRange)", level: 2)
+        log("j: \(H.jRange)", level: 2)
+        log("k: \(H.kRange)\n", level: 2)
 
+        if useBigRational {
+            log("useBigRational: \(useBigRational)\n", level: 2)
+        }
+        
         let tmpFile = "tmp-\(target)"
         if saveProgress, let tmp = load(tmpFile) {
             result = tmp
-            log("\ncontinue from:\n\(table(result, showZeros: true))", level: 2)
+            log("continue from:\n\(table(result, showZeros: true))\n", level: 3)
         }
         
-        log("", level: 2)
-        
-        for s in s0 ... s1 {
-            log("level: \(s)", level: 2)
+        for s in H.levelRange {
+            log("level: \(s)", level: 3)
             
             for v in 0 ... n {
                 for h in 0 ... n {
                     let (i, j, k) = H.hvs2ijk(h, v, s)
-                    if i > 0 || j < H.lowestADegree || H.highestADegree < j || result[[i, j, k]] != nil {
+                    
+                    // skipping conditions
+                    if result[[i, j, k]] != nil
+                        || i > 0
+                        || !H.iRange.contains(i)
+                        || !H.jRange.contains(j)
+                        || !H.kRange.contains(k + 2 * i)
+                    {
                         continue
                     }
                     
-                    log("\tH\([i, j, k]) =", level: 2)
+                    log("\tH\([i, j, k]) =", level: 3)
                     
                     let d = H[i, j, k].rank
                     
-                    log("\t\t\(d)", level: 2)
+                    log("\t\t\(d)", level: 3)
                     
                     result[[i, j, k]] = d
                     result[[-i, j, k + 2 * i]] = d
@@ -115,16 +138,11 @@ final class App {
                     }
                 }
             }
-            
             H.clearCache()
-            log("", level: 2)
         }
         
         result = result.exclude{ (_, d) in d == 0 }
         
-        if !exists(target) {
-            self.save(target, result)
-        }
         if saveProgress {
             delete(tmpFile)
         }
@@ -148,32 +166,28 @@ final class App {
         }
     }
     
-    func printResult(_ target: String, mirror: Bool = false, format: ResultFormat = .table) {
+    func printResult(_ target: String, format: ResultFormat = .table) {
         guard let str = self.load(target) else {
             return
         }
         
-        func _printResult(_ target: String, _ str: Structure) {
-            switch format {
-            case .table:
-                print("\(target)\n\(table(str))\n")
-            case .polynomial:
-                print("\(target) : \(PoincarePolynomial(str))")
-            case .texPolynomial:
-                print(texPolynomial(target, str))
-            case .texTable:
-                print(texTable(target, str))
-            }
+        switch format {
+        case .table:
+            print("\(target)\n\(table(str))\n")
+        case .polynomial:
+            print("\(target) : \(PoincarePolynomial(str))")
+        case .texPolynomial:
+            print(texPolynomial(target, str))
+        case .texTable:
+            print(texTable(target, str))
         }
-        
-        mirror ? _printResult("m(\(target))", self.mirror(str)) : _printResult(target, str)
     }
     
     func isDistinctPair(_ K1: String, _ K2: String) -> Bool {
         let str1 = load(K1)!
         let str2 = load(K2)!
         
-        return !(str1 == str2 || str1 == mirror(str2))
+        return !(str1 == str2 || str1 == str2.mirror)
     }
 
     func assertResults(_ input: String) {
@@ -222,10 +236,6 @@ final class App {
         }
         
         return res
-    }
-    
-    private func mirror(_ structure: Structure) -> Structure {
-        structure.mapPairs{ (g, r) in ([-g[0], -g[1], -g[2]], r)}
     }
     
     private func isKRThin(_ structure: Structure) -> Bool {
@@ -403,5 +413,11 @@ $k \\setminus j$ & \(js.map{ j in "$\(j)$" }.joined(separator: " & ")) \\\\
         if logLevel >= level {
             print(msg())
         }
+    }
+}
+
+internal extension Dictionary where Key == [Int], Value == Int {
+    var mirror: Self {
+        mapPairs{ (g, r) in ([-g[0], -g[1], -g[2]], r)}
     }
 }

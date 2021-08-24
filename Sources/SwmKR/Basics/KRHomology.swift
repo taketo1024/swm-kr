@@ -19,35 +19,25 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
     public typealias VerticalHomology = IndexedModuleStructure<Int, KR.TotalModule<R>>
 
     public let L: Link
-    public let normalized: Bool
     public let exclusion: Bool
     public let symmetry: Bool
     
-    private let gradingShift: KR.Grading
     private var connection: [Int : KR.EdgeConnection<R>]
     
     private let horizontalHomologyCache: Cache<hKey, HorizontalHomology> = .empty
     private let verticalHomologyCache: Cache<vKey, VerticalHomology> = .empty
 
-    public init(_ L: Link, normalized: Bool = true, exclusion: Bool = true, symmetry: Bool = true) {
-        let w = L.writhe
-        let b = L.resolved(by: L.orientationPreservingState).components.count
-        
+    public init(_ L: Link, exclusion: Bool = true, symmetry: Bool = true) {
         self.L = L
-        self.normalized = normalized
         self.exclusion = exclusion
         self.symmetry = symmetry
-        self.gradingShift = normalized ? [-w + b - 1, w + b - 1, w - b + 1] : .zero
         self.connection = KREdgeConnection(L).compute()
     }
     
     public subscript(idx: Index) -> Object {
         let (i, j, k) = idx.triple
-        if normalized && symmetry {
-            if i < lowestQDegree {
-                return .zeroModule
-            }
-            if j < lowestADegree || highestADegree < j {
+        if symmetry {
+            if !iRange.contains(i) || !jRange.contains(j) || !kRange.contains(k) || !kRange.contains(k + 2 * i) {
                 return .zeroModule
             }
             if i > 0 {
@@ -61,58 +51,84 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
         return H[v]
     }
     
-    public func clearCache() {
-        horizontalHomologyCache.clear()
-        verticalHomologyCache.clear()
-    }
-    
-    private var minSlice: Int {
-        -2 * L.crossingNumber
-    }
-    
-    public var lowestQDegree: Int {
-        -L.crossingNumber + L.numberOfSeifertCircles - 1
-    }
-    
-    public var highestQDegree: Int {
-        L.crossingNumber - L.numberOfSeifertCircles + 1
-    }
-    
-    public var lowestADegree: Int {
-        L.writhe - L.numberOfSeifertCircles + 1
-    }
-    
-    public var highestADegree: Int {
-        L.writhe + L.numberOfSeifertCircles - 1
-    }
-    
-    public var support: [MultiIndex<_3>] {
-        let n = L.crossingNumber
-        return ((0 ... n) * (0 ... n)).flatMap { (h, v) in
-            (minSlice ... 0).map { s in
-                let (i, j, k) = hvs2ijk(h, v, s)
-                return [i, j, k]
-            }
+    public func ijk2hvs(_ i: Int, _ j: Int, _ k: Int) -> (Int, Int, Int)? {
+        let g = baseGrading
+        let (a, b, c) = (g[0], g[1], g[2])
+
+        if (i - a).isEven && (j - b).isEven && (k - c).isEven {
+            return ((j - b)/2, (k - c)/2, (i - a)/2 - (j - b)/2)
+        } else {
+            return nil
         }
+    }
+    
+    public func hvs2ijk(_ h: Int, _ v: Int, _ s: Int) -> (Int, Int, Int) {
+        let g = baseGrading
+        let (a, b, c) = (g[0], g[1], g[2])
+        return (a + 2 * h + 2 * s,
+                b + 2 * h,
+                c + 2 * v)
     }
     
     public var baseGrading: KR.Grading {
         let n = L.crossingNumber
+        let w = L.writhe
+        let s = L.numberOfSeifertCircles
+
         let v0 = Cube.Coords.zeros(length: n)
-        return KR.baseGrading(link: L, hCoords: v0, vCoords: v0) + gradingShift
+        let base = KR.baseGrading(link: L, hCoords: v0, vCoords: v0)
+        let gradingShift: KR.Grading = [-w + s - 1, w + s - 1, w - s + 1]
+        
+        return base + gradingShift
     }
     
-    public func grading(of z: KR.TotalModule<R>) -> KR.Grading {
-        if z.isZero {
-            return .zero
+    public var levelRange: ClosedRange<Int> {
+        let n = L.crossingNumber
+        let s = L.numberOfSeifertCircles
+        
+        let l0 = -2 * n
+        let l1 = (-3 * n + s - 1) / 2
+
+        return l0 ... l1
+    }
+    
+    public var iRange: ClosedRange<Int> {
+        let n = L.crossingNumber
+        let s = L.numberOfSeifertCircles
+        
+        let i0 = -n + s - 1
+        let i1 =  n - s + 1
+        
+        return i0 ... i1
+    }
+    
+    public var jRange: ClosedRange<Int> {
+        let w = L.writhe
+        let s = L.numberOfSeifertCircles
+
+        let j0 = w - s + 1
+        let j1 = w + s - 1
+        
+        return j0 ... j1
+    }
+    
+    public var kRange: ClosedRange<Int> {
+        let n = L.crossingNumber
+        
+        let k0 = baseGrading[2]
+        let k1 = k0 + 2 * n
+        
+        return k0 ... k1
+    }
+
+    public var support: [MultiIndex<_3>] {
+        let n = L.crossingNumber
+        return levelRange.flatMap { s in
+            ((0 ... n) * (0 ... n)).map { (h, v) in
+                let (i, j, k) = hvs2ijk(h, v, s)
+                return [i, j, k]
+            }
         }
-        
-        let (v, x) = z.elements.anyElement!
-        let (h, y) = x.elements.anyElement!
-        let q = y.degree
-        
-        let g = KR.baseGrading(link: L, hCoords: h, vCoords: v)
-        return g + [2 * q, 0, 0] + gradingShift
     }
     
     public func horizontalComplex(at vCoords: Cube.Coords, slice: Int) -> ChainComplex1<KR.HorizontalModule<R>> {
@@ -147,11 +163,19 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
         }
     }
     
+    public func clearCache() {
+        horizontalHomologyCache.clear()
+        verticalHomologyCache.clear()
+    }
+}
+
+// convenience methods
+extension KRHomology {
     public func structure(restrictedTo: (Int, Int, Int) -> Bool = { (_, _, _) in true }) -> [KR.Grading : ModuleStructure<KR.TotalModule<R>>] {
         typealias E = (KR.Grading, ModuleStructure<KR.TotalModule<R>>)
         
         let n = L.crossingNumber
-        let elements = (minSlice ... 0).flatMap { s -> [E] in
+        let elements = levelRange.flatMap { s -> [E] in
             ((0 ... n) * (0 ... n)).compactMap { (h, v) -> E? in
                 let (i, j, k) = hvs2ijk(h, v, s)
                 if restrictedTo(i, j, k) {
@@ -164,7 +188,7 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
         }
         return Dictionary(elements)
     }
-    
+
     public func table(restrictedTo: (Int, Int, Int) -> Bool = { (_, _, _) in true }) -> String {
         typealias qPoly = KR.qPolynomial<𝐙>
         let str = structure(restrictedTo: restrictedTo)
@@ -210,23 +234,23 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
         qaPolynomial(structure())
     }
     
-    public var highestQPart: KR.qaPolynomial<𝐙> {
-        let str = structure { (i, _, _) in i == highestQDegree }
-        return qaPolynomial(str)
-    }
-    
     public var lowestQPart: KR.qaPolynomial<𝐙> {
-        let str = structure { (i, _, _) in i == lowestQDegree }
+        let str = structure { (i, _, _) in i == iRange.lowerBound }
         return qaPolynomial(str)
     }
     
-    public var highestAPart: KR.qaPolynomial<𝐙> {
-        let str = structure { (_, j, _) in j == highestADegree }
+    public var highestQPart: KR.qaPolynomial<𝐙> {
+        let str = structure { (i, _, _) in i == iRange.upperBound }
         return qaPolynomial(str)
     }
     
     public var lowestAPart: KR.qaPolynomial<𝐙> {
-        let str = structure { (_, j, _) in j == lowestADegree }
+        let str = structure { (_, j, _) in j == jRange.lowerBound }
+        return qaPolynomial(str)
+    }
+    
+    public var highestAPart: KR.qaPolynomial<𝐙> {
+        let str = structure { (_, j, _) in j == jRange.upperBound }
         return qaPolynomial(str)
     }
     
@@ -236,33 +260,14 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
             return ([i, j], (-1).pow( (k - j) / 2) * V.rank )
         })
     }
-    
-    public func ijk2hvs(_ i: Int, _ j: Int, _ k: Int) -> (Int, Int, Int)? {
-        let g = baseGrading
-        let (a, b, c) = (g[0], g[1], g[2])
+}
 
-        if (i - a).isEven && (j - b).isEven && (k - c).isEven {
-            return ((j - b)/2, (k - c)/2, (i - a)/2 - (j - b)/2)
-        } else {
-            return nil
-        }
-    }
-    
-    public func hvs2ijk(_ h: Int, _ v: Int, _ s: Int) -> (Int, Int, Int) {
-        let g = baseGrading
-        let (a, b, c) = (g[0], g[1], g[2])
-        return (a + 2 * h + 2 * s,
-                b + 2 * h,
-                c + 2 * v)
-    }
-    
-    private struct hKey: Hashable {
-        let vCoords: Cube.Coords
-        let slice: Int
-    }
+fileprivate struct hKey: Hashable {
+    let vCoords: Cube.Coords
+    let slice: Int
+}
 
-    private struct vKey: Hashable {
-        let hDegree: Int
-        let slice: Int
-    }
+fileprivate struct vKey: Hashable {
+    let hDegree: Int
+    let slice: Int
 }
