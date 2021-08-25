@@ -113,12 +113,7 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
     }
     
     public var kRange: ClosedRange<Int> {
-        let n = L.crossingNumber
-        
-        let k0 = baseGrading[2]
-        let k1 = k0 + 2 * n
-        
-        return k0 ... k1
+        iRange
     }
 
     public var support: [MultiIndex<_3>] {
