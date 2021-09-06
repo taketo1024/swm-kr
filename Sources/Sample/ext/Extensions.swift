@@ -12,7 +12,7 @@ import SwmxBigInt
 
 extension BigRational: ComputationalField {
     public typealias ComputationalMatrixImpl = DefaultSparseMatrixImpl<Self> // TODO
-    public typealias ComputationalSparseMatrixImpl = DefaultSparseMatrixImpl<Self>
+    public typealias ComputationalSparseMatrixImpl = _DefaultSparseMatrixImpl<Self>
     
     public var computationalWeight: Double {
         isZero ? 0 : Double(max(numerator.abs, denominator))
