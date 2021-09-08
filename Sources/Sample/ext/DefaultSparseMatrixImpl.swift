@@ -204,28 +204,28 @@ public struct _DefaultSparseMatrixImpl<R: Ring>: SparseMatrixImpl {
         assert(a.size.cols == b.size.rows)
         
         //      k              j        j
-        // i |  a    *  |     | |    i |*|
-        //   |          |   k |b|      | |
-        //   |  *       |  x  | |  ->  | |
+        //  i|  a    *  |     | |     i|*|
+        //   |          |    k|b|      | |
+        //   |  *       |  *  | |  ->  | |
         //   |          |     |*|      |*|
         //   |  *       |     | |      | |
         //
         
         let cols: [[ColEntry<R>]] =
             Array(0 ..< b.size.cols).parallelMap { j -> [ColEntry<R>] in
-                b.indexRange(j).flatMap { idx2 -> [ColEntry<R>] in
+                var col = Array(repeating: R.zero, count: a.size.rows)
+                for idx2 in b.indexRange(j) {
                     let k = b.rowIndices[idx2]
                     let b_kj = b.values[idx2]
-                    return a.indexRange(k).map { idx1 in
+                    for idx1 in a.indexRange(k) {
                         let i = a.rowIndices[idx1]
                         let a_ik = a.values[idx1]
-                        return ColEntry(i, a_ik * b_kj)
+                        col[i] = col[i] + a_ik * b_kj
                     }
                 }
-                .group{ $0.row }
-                .mapValues { $0.sum{ $0.value } }
-                .compactMap{ (i, a) in a.isZero ? nil : ColEntry(i, a) }
-                .sorted{ $0.row }
+                return col.enumerated().compactMap { (i, a) in
+                    !a.isZero ? (i, a) : nil
+                }
             }
         
         return .init(
