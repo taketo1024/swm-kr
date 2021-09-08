@@ -7,6 +7,7 @@
 
 import SwmCore
 import SwmMatrixTools
+import SwmxBigInt
 
 //  CSC (compressed sparse colums) format.
 //  https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format)
@@ -41,10 +42,8 @@ public struct _DefaultSparseMatrixImpl<R: Ring>: SparseMatrixImpl {
         )
     }
     
-    @_specialize(where R == 𝐙)
-    @_specialize(where R == 𝐐)
-    @_specialize(where R == 𝐅₂)
-    
+    @_specialize(where R == BigRational)
+
     public init(size: MatrixSize, initializer: (Initializer) -> Void) {
         assert(size.rows >= 0)
         assert(size.cols >= 0)
@@ -123,10 +122,8 @@ public struct _DefaultSparseMatrixImpl<R: Ring>: SparseMatrixImpl {
         (a.values, a.rowIndices, a.indexRanges) == (b.values, b.rowIndices, b.indexRanges)
     }
     
-    @_specialize(where R == 𝐙)
-    @_specialize(where R == 𝐐)
-    @_specialize(where R == 𝐅₂)
-    
+    @_specialize(where R == BigRational)
+
     public static func +(a: Self, b: Self) -> Self {
         assert(a.size == b.size)
         
@@ -201,10 +198,8 @@ public struct _DefaultSparseMatrixImpl<R: Ring>: SparseMatrixImpl {
         )
     }
     
-    @_specialize(where R == 𝐙)
-    @_specialize(where R == 𝐐)
-    @_specialize(where R == 𝐅₂)
-    
+    @_specialize(where R == BigRational)
+
     public static func *(a: Self, b: Self) -> Self {
         assert(a.size.cols == b.size.rows)
         
@@ -249,10 +244,8 @@ public struct _DefaultSparseMatrixImpl<R: Ring>: SparseMatrixImpl {
         return res
     }
     
-    @_specialize(where R == 𝐙)
-    @_specialize(where R == 𝐐)
-    @_specialize(where R == 𝐅₂)
-    
+    @_specialize(where R == BigRational)
+
     private static func compress(_ cols: [[ColEntry<R>]], sorted: Bool) -> ([R], [Int], [Int]) {
         let nnz = cols.sum{ $0.count }
         
