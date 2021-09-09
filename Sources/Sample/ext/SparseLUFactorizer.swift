@@ -99,8 +99,6 @@ public final class _SparseLUFactorizer<M: SparseMatrixImpl & LUFactorizable> whe
         //
 
         let (n, m) = target.size
-        let isLarge = min(n, m) > 20000
-        
         let pf = _MatrixPivotFinder(target, mode: .colBased)
         pf.run()
         
@@ -121,20 +119,12 @@ public final class _SparseLUFactorizer<M: SparseMatrixImpl & LUFactorizable> whe
         let C  = R.submatrix(rowRange: r ..< n, colRange: 0 ..< r)
         let D  = R.submatrix(rowRange: r ..< n, colRange: r ..< m)
         
-        if isLarge {
-            log("solve lower triangular")
-        }
-        
         let B1 = Matrix.solveLowerTriangular(L0, B)
         
         let L = L0.stack(C)
         let U = Matrix.identity(size: (r, r)).concat(B1)
         
         compose(P, Q, L, U)
-        
-        if isLarge {
-            log("compute S")
-        }
         
         let S = D - C * B1
         self.target = S
