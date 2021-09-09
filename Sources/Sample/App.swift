@@ -29,7 +29,7 @@ final class App {
     }
     
     func computeAll(_ input: String, maxCrossings: Int = 12, skipExisting: Bool = true) {
-        let file = "\(dir)/\(input).csv"
+        let file = "\(storage.dir)/\(input).csv"
         guard let csv = try? CSV(url: URL(fileURLWithPath: file)) else {
             fatalError("Couldn't load \(file)")
         }
@@ -156,7 +156,7 @@ final class App {
     }
     
     func printResults(_ input: String, format: ResultFormat = .table) {
-        let file = "\(dir)/\(input).csv"
+        let file = "\(storage.dir)/\(input).csv"
         guard let csv = try? CSV(url: URL(fileURLWithPath: file)) else {
             fatalError("Couldn't load \(file)")
         }
@@ -166,10 +166,11 @@ final class App {
         }
     }
     
-    func printResult(_ target: String, format: ResultFormat = .table) {
-        guard let str = self.load(target) else {
+    func printResult(_ target: String, format: ResultFormat = .table, mirror: Bool = false) {
+        guard let _str = self.load(target) else {
             return
         }
+        let str = mirror ? _str.mirror : _str
         
         switch format {
         case .table:
@@ -191,7 +192,7 @@ final class App {
     }
 
     func assertResults(_ input: String) {
-        let file = "\(dir)/\(input).csv"
+        let file = "\(storage.dir)/\(input).csv"
         guard let csv = try? CSV(url: URL(fileURLWithPath: file)) else {
             fatalError("Couldn't load \(file)")
         }
@@ -219,7 +220,7 @@ final class App {
     }
     
     func findKRThick(_ input: String) -> [String] {
-        let file = "\(dir)/\(input).csv"
+        let file = "\(storage.dir)/\(input).csv"
         guard let csv = try? CSV(url: URL(fileURLWithPath: file)) else {
             fatalError("Couldn't load \(file)")
         }
@@ -243,11 +244,78 @@ final class App {
         return Set(s).count == 1
     }
     
+    func findIdentical() {
+        var strs: [String: Structure] = [:]
+        for input in ["braid-10", "braid-11"] {
+            let file = "\(storage.dir)/\(input).csv"
+            guard let csv = try? CSV(url: URL(fileURLWithPath: file)) else {
+                fatalError("Couldn't load \(file)")
+            }
+            try! csv.enumerateAsDict() { row in
+                let target = row["name"]!
+                guard let str = self.load(target) else {
+                    return
+                }
+                strs[target] = str
+                strs["m\(target)"] = str.mirror
+            }
+        }
+        
+        let res = strs.group { $0.value }.filter{ $0.value.count > 1 }.map { (_, list) in
+            list.map{ $0.key }
+        }
+        
+        print(res.map{ list in "(\(list.joined(separator: ", ")))"}.joined(separator: "\n"))
+    }
+    
+//    func findStrictlyStronger() {
+//        var polys: [String: KR.qaPolynomial<Int>] = [:]
+//        for input in ["braid-10", "braid-11"] {
+//            let file = "\(storage.dir)/\(input).csv"
+//            guard let csv = try? CSV(url: URL(fileURLWithPath: file)) else {
+//                fatalError("Couldn't load \(file)")
+//            }
+//            try! csv.enumerateAsDict() { row in
+//                let target = row["name"]!
+//                guard let str = self.load(target) else {
+//                    return
+//                }
+//                polys[target] = self.HOMFLYPolynomial(str)
+//                polys["m\(target)"] = self.HOMFLYPolynomial(str.mirror)
+//            }
+//        }
+//
+//        let candidates = polys
+//            .group { $0.value }
+//            .filter { $0.value.count > 1 }
+//            .map { (_, list) in
+//                list.map{ $0.key }
+//            }
+//
+//        print("candidates:", candidates)
+//
+//        for group in candidates {
+//            var strs: [String: Structure] = [:]
+//            for target in group {
+//                let file = target.starts(with: "m") ? String(target[1 ..< target.count]) : target
+//                let str = self.load(file)!
+//                strs[target] = target.starts(with: "m") ? str.mirror : str
+//            }
+//            let res = strs.group { $0.value }.map { (_, list) in
+//                list.map{ $0.key }
+//            }
+//
+//            if res.count > 1 {
+//                print("distinct:", res)
+//            }
+//        }
+//    }
+    
     public func HOMFLYPolynomial(_ structure: Structure) -> KR.qaPolynomial<Int> {
         .init(elements: structure.map { (g, r) in
             let (i, j, k) = (g[0], g[1], g[2])
             return ([i, j], (-1).pow( (k - j) / 2) * r )
-        })
+        }).reduced
     }
     
     public func PoincarePolynomial(_ structure: Structure) -> KR.tqaPolynomial<Int> {
@@ -321,7 +389,7 @@ final class App {
         
         return """
 \\begin{minipage}{\\textwidth}
-\\item $\(target)$ \\vspace{0.5em} \\\\
+\\item $\(texKnotName(target))$ \\vspace{0.5em} \\\\
 \\begin{tabular}{l|\(Array(repeating: "l", count: js.count).joined())}
 $k \\setminus j$ & \(js.map{ j in "$\(j)$" }.joined(separator: " & ")) \\\\
 \\hline
@@ -331,6 +399,15 @@ $k \\setminus j$ & \(js.map{ j in "$\(j)$" }.joined(separator: " & ")) \\\\
 \\end{minipage}
 %
 """
+    }
+    
+    private func texKnotName(_ target: String) -> String {
+        let r = try! Regex(pattern: "([0-9an]+)_([0-9]+)")
+        return r.replaceFirst(in: target) { m in
+            let main = m.group(at: 1)!
+            let sub  = m.group(at: 2)!
+            return "\(main)_{\(sub)}"
+        }
     }
     
     private func parseHOMFLY(_ poly: String) -> KR.qaPolynomial<Int> {
