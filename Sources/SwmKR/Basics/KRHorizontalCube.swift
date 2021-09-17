@@ -314,7 +314,7 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
 }
 
 extension KRHorizontalCube where R: HomologyCalculatable {
-    func homology() -> IndexedModuleStructure<Int, KR.HorizontalModule<R>> {
+    func homology() -> GradedModuleStructure<Int, KR.HorizontalModule<R>> {
         let C = self.asChainComplex()
         let H = C.homology()
         

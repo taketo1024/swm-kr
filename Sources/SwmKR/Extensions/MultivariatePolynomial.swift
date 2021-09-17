@@ -7,9 +7,9 @@
 
 import SwmCore
 
-extension MultiIndex {
+extension IntList {
     var firstNonZeroIndex: Int? {
-        indices.enumerated().first{ (i, e) in e > 0 }?.offset
+        enumerated().first{ (i, e) in e > 0 }?.offset
     }
 }
 
@@ -27,14 +27,14 @@ extension MultivariatePolynomialType {
     
     func secondaryExclusive(in vars: Set<Int>) -> Int? {
         if !elements.allSatisfy({ (e, a) in
-            a.isZero || e.total <= 2 && e.indices.enumerated().allSatisfy{ (i, ei) in
+            a.isZero || e.total <= 2 && e.enumerated().allSatisfy{ (i, ei) in
                 ei == 0 || vars.contains(i)
             }
         }) {
             return nil
         }
         return elements.first{ (e, a) in
-            !a.isZero && e.indices.contains(2)
+            !a.isZero && e.contains(2)
         }?.key.firstNonZeroIndex
     }
     
@@ -42,7 +42,7 @@ extension MultivariatePolynomialType {
         elements.reduce(into: []) { (res, next) in
             let (e, a) = next
             if a.isZero { return }
-            for (i, ei) in e.indices.enumerated() where ei > 0 {
+            for (i, ei) in e.enumerated() where ei > 0 {
                 res.insert(i)
             }
         }
@@ -79,7 +79,7 @@ extension MultivariatePolynomialType {
         while !r.isZero {
             let e1 = r.highestExponent(as: i)
             let e = e1 - e0
-            if e.indices.contains(where: {$0 < 0} ) {
+            if e.contains(where: {$0 < 0} ) {
                 break
             }
             
@@ -99,7 +99,7 @@ extension RingHom where Domain: MultivariatePolynomialType, Domain == Codomain {
     public static func mapping(_ f: @escaping (Int) -> Codomain?) -> Self {
         .init { (p: Domain) in
             p.elements.sum { (e, a) in
-                a * e.indices.enumerated().multiply { (i, e_i) -> Codomain in
+                a * e.enumerated().multiply { (i, e_i) -> Codomain in
                     if let y = f(i) {
                         return y.pow(e_i) // map x_i^e_i ↦ y^e_i.
                     } else {

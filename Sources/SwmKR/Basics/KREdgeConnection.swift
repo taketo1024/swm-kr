@@ -22,9 +22,8 @@ internal class KREdgeConnection<R: Ring> {
         let n = L.crossingNumber
         let res = L.orientationPreservingState
         
-        let G = L.seifertGraph
-        let T = G.spanningTree()
-        let S = Set(T.collectEdges().map{ $0.value })
+        let G = SeifertGraph(L)
+        let S = G.spanningTree
 
         var D = L.copy()
         for c in 0 ..< n where !S.contains(c) {

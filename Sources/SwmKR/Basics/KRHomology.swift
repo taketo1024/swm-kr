@@ -10,13 +10,13 @@ import SwmKnots
 import SwmHomology
 import SwmKhovanov
 
-public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
+public struct KRHomology<R: HomologyCalculatable>: GradedModuleStructureType {
     public typealias BaseModule = KR.TotalModule<R>
-    public typealias Index = MultiIndex<_3>
+    public typealias Index = IntList<_3>
     public typealias Object = ModuleStructure<BaseModule>
 
-    public typealias HorizontalHomology = IndexedModuleStructure<Int, KR.HorizontalModule<R>>
-    public typealias VerticalHomology = IndexedModuleStructure<Int, KR.TotalModule<R>>
+    public typealias HorizontalHomology = GradedModuleStructure<Int, KR.HorizontalModule<R>>
+    public typealias VerticalHomology = GradedModuleStructure<Int, KR.TotalModule<R>>
 
     public let L: Link
     public let exclusion: Bool
@@ -116,7 +116,7 @@ public struct KRHomology<R: HomologyCalculatable>: IndexedModuleStructureType {
         iRange
     }
 
-    public var support: [MultiIndex<_3>] {
+    public var support: [IntList<_3>] {
         let n = L.crossingNumber
         return levelRange.flatMap { s in
             ((0 ... n) * (0 ... n)).map { (h, v) in
@@ -189,7 +189,7 @@ extension KRHomology {
         let str = structure(restrictedTo: restrictedTo)
         let table = str
             .group { (ijk, _) in
-                MultiIndex<_2>(ijk[1], ijk[2])
+                IntList<_2>(ijk[1], ijk[2])
             }
             .mapValues{ list in
                 qPoly(elements: list.map{ (ijk, V) in
