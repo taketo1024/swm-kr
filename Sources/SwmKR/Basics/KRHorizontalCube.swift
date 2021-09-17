@@ -22,7 +22,6 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
     var exclusion: Exclusion
     
     private let vertexCache: Cache<Coords, Vertex> = .empty
-    private let   edgeCache: Cache<Coords, Edge>   = .empty
     
     init(link L: Link, vCoords: Coords, slice: Int, exclusion: Bool = false) { // TODO 
         let conn = KREdgeConnection<R>(L).compute()
@@ -105,18 +104,16 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
     
     func edge(from: Coords, to: Coords) -> ModuleEnd<BaseModule> {
         assert((to - from).weight == 1)
-        return edgeCache.getOrSet(key: from.concat(with: to)) {
-            let r = (to - from).enumerated().first { (_, b) in b == 1 }!.offset
-            let p = exclusion.edgeFactor(r)
-            if p.isZero {
-                return .zero
-            } else {
-                let e = edgeSign(from: from, to: to)
-                return .init { z -> BaseModule in
-                    let q = MultivariatePolynomial(z)
-                    let r = e * exclusion.exclude(p * q)
-                    return r.asLinearCombination
-                }
+        let r = (to - from).enumerated().first { (_, b) in b == 1 }!.offset
+        let p = exclusion.edgeFactor(r)
+        if p.isZero {
+            return .zero
+        } else {
+            let e = edgeSign(from: from, to: to)
+            return .init { z -> BaseModule in
+                let q = MultivariatePolynomial(z)
+                let r = e * exclusion.exclude(p * q)
+                return r.asLinearCombination
             }
         }
     }
@@ -317,7 +314,7 @@ internal struct KRHorizontalCube<R: Ring>: ModuleCube {
 }
 
 extension KRHorizontalCube where R: HomologyCalculatable {
-    func homology() -> IndexedModuleStructure<Int, KR.HorizontalModule<R>> {
+    func homology() -> GradedModuleStructure<Int, KR.HorizontalModule<R>> {
         let C = self.asChainComplex()
         let H = C.homology()
         

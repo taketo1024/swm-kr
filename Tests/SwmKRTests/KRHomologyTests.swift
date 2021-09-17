@@ -9,7 +9,10 @@ import XCTest
 import SwmCore
 import SwmKnots
 import SwmHomology
+
 @testable import SwmKR
+
+extension RationalNumber: HomologyCalculatable {}
 
 class KRHomologyTests: XCTestCase {
     
