@@ -323,7 +323,7 @@ extension KRHorizontalCube where R: HomologyCalculatable {
             return .init(
                 generators: Hi.generators.map{ exclusion.expand(cycle: $0) },
                 vectorizer: { z in
-                    Hi.vectorize( exclusion.collapse(z) )
+                    Hi.vectorEntries( exclusion.collapse(z) )
                 }
             )
         }
